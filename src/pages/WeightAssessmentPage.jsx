@@ -26,9 +26,15 @@ export default function WeightAssessmentPage() {
   const [sleepAnswers, setSleepAnswers] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    api.getWeightQuestions().then(setAllQuestions).catch(() => toast.error('Failed to load questions'));
+    api.getWeightQuestions()
+      .then(setAllQuestions)
+      .catch(() => {
+        setLoadError('Failed to load questions. Please try again.');
+        toast.error('Failed to load questions');
+      });
   }, []);
 
   const currentSection = SECTIONS[sectionIdx];
@@ -252,6 +258,13 @@ export default function WeightAssessmentPage() {
 
   /* ── Quiz View ── */
   if (!allQuestions) {
+    if (loadError) {
+      return (
+        <main className="page">
+          <p className="caution-text">{loadError}</p>
+        </main>
+      );
+    }
     return <main className="page"><p>Loading assessment...</p></main>;
   }
 

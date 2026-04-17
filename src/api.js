@@ -1,4 +1,5 @@
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000);
 
 function getToken() {
   return localStorage.getItem('nouryum_token') || '';
@@ -7,6 +8,8 @@ function getToken() {
 async function request(path, options = {}, customToken) {
   const token = customToken || getToken();
   const headers = {};
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   if (!(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
@@ -15,10 +18,21 @@ async function request(path, options = {}, customToken) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: { ...headers, ...(options.headers || {}) }
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: { ...headers, ...(options.headers || {}) },
+      signal: controller.signal
+    });
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('Request timed out. Please check your internet connection and try again.');
+    }
+    throw new Error('Unable to connect to server. Please try again.');
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));

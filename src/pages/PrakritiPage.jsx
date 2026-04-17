@@ -6,6 +6,8 @@ export default function PrakritiPage() {
   const { user, setUser } = useAuth();
   const userId = user?.id || user?.userId || 'u1';
   const [questions, setQuestions] = useState([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [result, setResult] = useState('');
@@ -13,7 +15,10 @@ export default function PrakritiPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    api.getPrakritiQuestions().then((data) => setQuestions(data.questions));
+    api.getPrakritiQuestions()
+      .then((data) => setQuestions(data.questions || []))
+      .catch(() => setLoadError('Unable to load assessment questions. Please try again.'))
+      .finally(() => setLoadingQuestions(false));
   }, []);
 
   const question = questions[index];
@@ -56,8 +61,30 @@ export default function PrakritiPage() {
     }
   };
 
-  if (!question) {
+  if (loadingQuestions) {
     return <main className="page loading-text">Loading assessment...</main>;
+  }
+
+  if (loadError) {
+    return (
+      <main className="page">
+        <section className="quiz-panel">
+          <h1>Prakriti Assessment</h1>
+          <p className="caution-text">{loadError}</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!question) {
+    return (
+      <main className="page">
+        <section className="quiz-panel">
+          <h1>Prakriti Assessment</h1>
+          <p>No questions available right now. Please try again later.</p>
+        </section>
+      </main>
+    );
   }
 
   return (
