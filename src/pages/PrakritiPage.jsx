@@ -13,6 +13,7 @@ export default function PrakritiPage() {
   const [result, setResult] = useState('');
   const [details, setDetails] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
 
   useEffect(() => {
     api.getPrakritiQuestions()
@@ -54,8 +55,10 @@ export default function PrakritiPage() {
 
       setResult(`Your dominant prakriti is ${prakriti.toUpperCase()}`);
       if (pd) setDetails(pd);
+      setIsCompleted(true);
     } catch (err) {
       setResult('Failed to save. Please try again.');
+      setIsCompleted(false);
     } finally {
       setSubmitting(false);
     }
@@ -100,39 +103,43 @@ export default function PrakritiPage() {
         <p>Complete the following questionnaire to understand your Prakriti:</p>
         <progress max="100" value={progress} />
 
-        <h2>
-          Question {index + 1} of {questions.length}: {question.prompt}
-        </h2>
-        <div className="option-row">
-          {question.options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={answers[question.id] === option.value ? 'selected' : ''}
-              onClick={() => selectOption(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        {!isCompleted && (
+          <>
+            <h2>
+              Question {index + 1} of {questions.length}: {question.prompt}
+            </h2>
+            <div className="option-row">
+              {question.options.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={answers[question.id] === option.value ? 'selected' : ''}
+                  onClick={() => selectOption(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
 
-        <div className="quiz-actions">
-          <button
-            type="button"
-            onClick={() => setIndex((prev) => Math.max(0, prev - 1))}
-            disabled={index === 0}
-          >
-            ← Back
-          </button>
-          <button
-            type="button"
-            className="next-btn"
-            onClick={onNext}
-            disabled={submitting}
-          >
-            {submitting ? 'Saving...' : index < questions.length - 1 ? 'Next' : 'Submit'}
-          </button>
-        </div>
+            <div className="quiz-actions">
+              <button
+                type="button"
+                onClick={() => setIndex((prev) => Math.max(0, prev - 1))}
+                disabled={index === 0}
+              >
+                ← Back
+              </button>
+              <button
+                type="button"
+                className="next-btn"
+                onClick={onNext}
+                disabled={submitting}
+              >
+                {submitting ? 'Saving...' : index < questions.length - 1 ? 'Next' : 'Submit'}
+              </button>
+            </div>
+          </>
+        )}
 
         {result && <h3 className="success-text" style={{ marginTop: 24, textAlign: 'center' }}>{result}</h3>}
         {details && (
