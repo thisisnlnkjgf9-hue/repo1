@@ -36,19 +36,19 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/admin" element={<AdminPage />} />
-          <Route path="/" element={<RequireAuth><HomePage /></RequireAuth>} />
-          <Route path="/about" element={<RequireAuth><AboutPage /></RequireAuth>} />
-          <Route path="/blogs" element={<RequireAuth><BlogsPage /></RequireAuth>} />
-          <Route path="/chakras" element={<RequireAuth><ChakrasPage /></RequireAuth>} />
-          <Route path="/blogs/:id" element={<RequireAuth><BlogDetailPage /></RequireAuth>} />
-          <Route path="/feedback" element={<RequireAuth><FeedbackPage /></RequireAuth>} />
-          <Route path="/doctors" element={<RequireAuth><DoctorsPage /></RequireAuth>} />
-          <Route path="/products" element={<RequireAuth><ProductsPage /></RequireAuth>} />
-          <Route path="/prakriti" element={<RequireAuth><PrakritiPage /></RequireAuth>} />
-          <Route path="/labs" element={<RequireAuth><LabPage /></RequireAuth>} />
-          <Route path="/symptoms" element={<RequireAuth><SymptomFormPage /></RequireAuth>} />
-          <Route path="/remedies" element={<RequireAuth><RemediesPage /></RequireAuth>} />
-          <Route path="/diet" element={<RequireAuth><DietPage /></RequireAuth>} />
+          <Route path="/" element={<HomePage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/blogs" element={<BlogsPage />} />
+          <Route path="/chakras" element={<ChakrasPage />} />
+          <Route path="/blogs/:id" element={<BlogDetailPage />} />
+          <Route path="/feedback" element={<FeedbackPage />} />
+          <Route path="/doctors" element={<DoctorsPage />} />
+          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/prakriti" element={<PrakritiPage />} />
+          <Route path="/labs" element={<LabPage />} />
+          <Route path="/symptoms" element={<SymptomFormPage />} />
+          <Route path="/remedies" element={<RemediesPage />} />
+          <Route path="/diet" element={<DietPage />} />
           <Route path="/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
           {/* Weight Management */}
           <Route path="/weight" element={<RequireAuth><WeightManagementPage /></RequireAuth>} />
@@ -56,7 +56,7 @@ export default function App() {
           <Route path="/weight/plan" element={<RequireAuth><WeightPlanPage /></RequireAuth>} />
           <Route path="/weight/progress" element={<RequireAuth><WeightProgressPage /></RequireAuth>} />
           {/* Panchakarma */}
-          <Route path="/panchakarma" element={<RequireAuth><PanchakarmaPage /></RequireAuth>} />
+          <Route path="/panchakarma" element={<PanchakarmaPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

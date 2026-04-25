@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useRazorpay } from '../hooks/useRazorpay';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import LoginRequiredModal from '../components/LoginRequiredModal';
 
 export default function ProductsPage() {
-  const { user } = useAuth();
+  const { user, isLoggedIn } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const userId = user?.id || user?.userId || 'u1';
   const { pay } = useRazorpay();
   const toast = useToast();
@@ -18,6 +22,7 @@ export default function ProductsPage() {
   const [contactNumber, setContactNumber] = useState('');
   const [address, setAddress] = useState('');
   const [pincode, setPincode] = useState('');
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const loadProducts = async (searchValue = '') => {
     try {
@@ -43,6 +48,14 @@ export default function ProductsPage() {
   }, []);
 
   useEffect(() => {
+    if (location.state?.openCart) {
+      setCartOpen(true);
+      loadCart();
+      navigate('/products', { replace: true, state: null });
+    }
+  }, [location.state, navigate]);
+
+  useEffect(() => {
     const timer = setTimeout(() => {
       loadProducts(query);
     }, 250);
@@ -59,6 +72,11 @@ export default function ProductsPage() {
   const cartTotal = useMemo(() => cart.reduce((s, i) => s + i.priceInr * i.quantity, 0), [cart]);
 
   const add = async (product) => {
+    if (!isLoggedIn) {
+      setShowLoginModal(true);
+      return;
+    }
+
     try {
       await api.addToCart({ userId, productId: product.id, quantity: 1 });
       await loadCart();
@@ -68,12 +86,33 @@ export default function ProductsPage() {
     }
   };
 
+  const buyNow = async (product) => {
+    if (!isLoggedIn) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    try {
+      await api.addToCart({ userId, productId: product.id, quantity: 1 });
+      await loadCart();
+      setCartOpen(true);
+      toast.success('Added to cart. Complete checkout below.');
+    } catch {
+      toast.error('Could not start checkout. Please try again.');
+    }
+  };
+
   const remove = async (id) => {
     await api.removeFromCart({ userId, productId: id });
     await loadCart();
   };
 
   const handleCheckout = async () => {
+    if (!isLoggedIn) {
+      setShowLoginModal(true);
+      return;
+    }
+
     if (!cart.length || processing) return;
     if (!customerName.trim() || !contactNumber.trim() || !address.trim() || !pincode.trim()) {
       toast.warning('Please fill in all delivery details before checkout.');
@@ -94,7 +133,8 @@ export default function ProductsPage() {
             pincode,
             paymentMethod: 'razorpay',
             razorpayOrderId: paymentData.razorpay_order_id,
-            razorpayPaymentId: paymentData.razorpay_payment_id
+            razorpayPaymentId: paymentData.razorpay_payment_id,
+            razorpaySignature: paymentData.razorpay_signature
           });
 
           toast.success('Order placed successfully!');
@@ -108,11 +148,16 @@ export default function ProductsPage() {
       },
       onDismiss: () => {
         setProcessing(false);
+      },
+      onError: (error) => {
+        toast.error(error?.message || 'Payment failed. No order was placed.');
+        setProcessing(false);
       }
     });
   };
 
   return (
+    <>
     <main className="page products-page">
       <div className="products-head">
         <h1>Buy Products</h1>
@@ -135,7 +180,10 @@ export default function ProductsPage() {
             <img src={product.image} alt={product.name} loading="lazy" />
             <h3>{product.name}</h3>
             <p className="product-price">₹{product.priceInr}</p>
-            <button type="button" onClick={() => add(product)}>Add to Cart</button>
+            <div className="product-card-actions">
+              <button type="button" className="add-btn" onClick={() => add(product)}>Add to Cart</button>
+              <button type="button" className="buy-btn" onClick={() => buyNow(product)}>Buy Now</button>
+            </div>
           </article>
         ))}
       </div>
@@ -182,12 +230,23 @@ export default function ProductsPage() {
                 disabled={cart.length === 0 || processing}
                 onClick={handleCheckout}
               >
-                {processing ? 'Processing...' : 'Checkout (Demo Razorpay)'}
+                {processing ? 'Processing...' : 'Checkout'}
               </button>
             </div>
           </aside>
         </>
       )}
     </main>
+
+      <LoginRequiredModal
+        open={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLoggedIn={() => {
+          loadCart();
+        }}
+        title="Login required for purchase"
+        message="Please sign in with Google to add products to cart and complete checkout."
+      />
+    </>
   );
 }

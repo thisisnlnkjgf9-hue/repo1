@@ -8,6 +8,8 @@ export const users = [
   }
 ];
 
+export const reportUploads = [];
+
 export const doctors = [
   {
     id: 'd1',
@@ -54,7 +56,7 @@ export const products = [
     category: 'supplements',
     priceInr: 1249,
     stock: 32,
-    tags: ['sleep', 'stress', 'vata'],
+    tags: ['sleep', 'stress', 'vata', 'insomnia', 'anxiety', 'relaxation', 'magnesium'],
     description: 'Supports sleep quality and stress regulation.',
     image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=500&q=80'
   },
@@ -64,7 +66,7 @@ export const products = [
     category: 'supplements',
     priceInr: 999,
     stock: 28,
-    tags: ['general', 'kapha'],
+    tags: ['general', 'kapha', 'multivitamin', 'wellness', 'deficiency', 'nutrition'],
     description: 'Balanced daily support for overall wellness.',
     image: 'https://images.unsplash.com/photo-1616671276441-2f2c277b8bf0?auto=format&fit=crop&w=500&q=80'
   },
@@ -74,7 +76,7 @@ export const products = [
     category: 'medicines',
     priceInr: 1599,
     stock: 19,
-    tags: ['immunity', 'pitta'],
+    tags: ['immunity', 'pitta', 'vata', 'kapha', 'vitamin', 'vitamin-d', 'vitamin-d3', 'd3', 'k2', 'bone', 'deficiency', 'calcium', 'fatigue', 'weakness', 'sunlight'],
     description: 'Supports bone and immunity health.',
     image: 'https://images.unsplash.com/photo-1607619056574-7b8d3ee536b2?auto=format&fit=crop&w=500&q=80'
   },
@@ -84,7 +86,7 @@ export const products = [
     category: 'hair-care',
     priceInr: 2199,
     stock: 16,
-    tags: ['hair', 'skin', 'vata'],
+    tags: ['hair', 'skin', 'vata', 'collagen', 'anti-aging', 'joints', 'elasticity', 'hair-loss'],
     description: 'Nourishes skin elasticity and hair strength.',
     image: 'https://images.unsplash.com/photo-1596755389378-c31d21fd1273?auto=format&fit=crop&w=500&q=80'
   },
@@ -94,7 +96,7 @@ export const products = [
     category: 'medicines',
     priceInr: 1449,
     stock: 24,
-    tags: ['gut', 'digestion', 'kapha'],
+    tags: ['gut', 'digestion', 'kapha', 'probiotic', 'ibs', 'bloating', 'stomach', 'constipation', 'acidity'],
     description: 'Supports gut flora and digestive comfort.',
     image: 'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?auto=format&fit=crop&w=500&q=80'
   },
@@ -104,9 +106,19 @@ export const products = [
     category: 'medicines',
     priceInr: 1199,
     stock: 41,
-    tags: ['inflammation', 'pitta'],
+    tags: ['inflammation', 'pitta', 'turmeric', 'curcumin', 'pain', 'arthritis', 'joints', 'anti-inflammatory'],
     description: 'Traditional anti-inflammatory support.',
     image: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=500&q=80'
+  },
+  {
+    id: 'p-test-1',
+    name: 'Razorpay Test Product (Rs 1)',
+    category: 'testing',
+    priceInr: 1,
+    stock: 999,
+    tags: ['test', 'razorpay', 'payment'],
+    description: 'Test product for validating Razorpay checkout flow.',
+    image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=500&q=80'
   }
 ];
 
@@ -152,6 +164,25 @@ export const podcasts = [
     title: 'Healthy Living with Pathya',
     duration: '18:10',
     host: 'Dr. Nandani Sharma'
+  }
+];
+
+export const heroSlides = [
+  {
+    id: 'hs1',
+    title: 'Best Assessments',
+    subtitle: 'Doctor Recommended',
+    image: 'https://zhbnmlroytjmdykkvwhn.storage.supabase.co/storage/v1/object/public/nouryum/site/hero_bg.png',
+    order: 1,
+    isActive: true
+  },
+  {
+    id: 'hs2',
+    title: 'Natural Remedies',
+    subtitle: 'Personalized for You',
+    image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1200&q=80',
+    order: 2,
+    isActive: true
   }
 ];
 

@@ -1,9 +1,179 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import NavTabs from '../components/NavTabs';
+import { api } from '../api';
+import { useAuth } from '../context/AuthContext';
+import LoginRequiredModal from '../components/LoginRequiredModal';
+
+const SUPABASE_PRODUCTS = 'https://zhbnmlroytjmdykkvwhn.storage.supabase.co/storage/v1/object/public/nouryum/site/products';
+
+const PRODUCT_IMAGES = [
+  { src: `${SUPABASE_PRODUCTS}/product1.jpeg`, label: 'Herbal Hair Care' },
+  { src: `${SUPABASE_PRODUCTS}/product2.jpeg`, label: 'Ayurvedic Shampoo' },
+  { src: `${SUPABASE_PRODUCTS}/product3.jpeg`, label: 'Natural Oils' },
+  { src: `${SUPABASE_PRODUCTS}/product4.jpeg`, label: 'Root Strengthener' },
+  { src: `${SUPABASE_PRODUCTS}/product5.jpeg`, label: 'Scalp Therapy' },
+  { src: `${SUPABASE_PRODUCTS}/product6.jpeg`, label: 'Herbal Blend' },
+  { src: `${SUPABASE_PRODUCTS}/product7.jpeg`, label: 'Pure Botanicals' },
+];
+
+function ProductShowcase() {
+  const [active, setActive] = useState(0);
+  const [prev, setPrev]     = useState(null);
+  const [fading, setFading] = useState(false);
+  const timerRef            = useRef(null);
+  const navigate            = useNavigate();
+
+  const goTo = (idx) => {
+    if (idx === active || fading) return;
+    setPrev(active);
+    setFading(true);
+    setActive(idx);
+    setTimeout(() => { setPrev(null); setFading(false); }, 700);
+  };
+
+  const next = () => goTo((active + 1) % PRODUCT_IMAGES.length);
+  const prev_ = () => goTo((active - 1 + PRODUCT_IMAGES.length) % PRODUCT_IMAGES.length);
+
+  useEffect(() => {
+    timerRef.current = setInterval(next, 3800);
+    return () => clearInterval(timerRef.current);
+  }, [active, fading]);
+
+  return (
+    <section className="product-showcase" id="product-showcase">
+      {/* Header row */}
+      <div className="product-showcase-head">
+        <div className="product-showcase-label">🌿 Our Products</div>
+        <h2 className="product-showcase-title">Crafted by Nature, Proven by Science</h2>
+        <button className="ghost-btn product-showcase-cta" onClick={() => navigate('/products')}>
+          Shop All Products →
+        </button>
+      </div>
+
+      {/* Slideshow */}
+      <div
+        className="product-slideshow"
+        onMouseEnter={() => clearInterval(timerRef.current)}
+        onMouseLeave={() => { timerRef.current = setInterval(next, 3800); }}
+      >
+        {/* Previous slide (fading out) */}
+        {prev !== null && (
+          <div
+            className="product-slide product-slide--out"
+            style={{ backgroundImage: `url('${PRODUCT_IMAGES[prev].src}')` }}
+          />
+        )}
+
+        {/* Active slide (fading in) */}
+        {PRODUCT_IMAGES.map((img, i) => (
+          <div
+            key={img.src}
+            className={`product-slide ${i === active ? 'product-slide--in' : 'product-slide--hidden'}`}
+            style={{ backgroundImage: `url('${img.src}')` }}
+          >
+            <div className="product-slide-overlay" />
+            <div className="product-slide-content">
+              <span className="product-slide-tag">Nouryum Essentials</span>
+              <p className="product-slide-label">{img.label}</p>
+              <button className="product-slide-btn" onClick={() => navigate('/products')}>
+                Shop Now ↗
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {/* Arrows */}
+        <button className="slideshow-arrow slideshow-arrow--left" onClick={prev_} aria-label="Previous">‹</button>
+        <button className="slideshow-arrow slideshow-arrow--right" onClick={next} aria-label="Next">›</button>
+
+        {/* Dot indicators */}
+        <div className="slideshow-dots">
+          {PRODUCT_IMAGES.map((_, i) => (
+            <button
+              key={i}
+              className={`slideshow-dot ${i === active ? 'active' : ''}`}
+              onClick={() => goTo(i)}
+              aria-label={`Go to slide ${i + 1}`}
+            />
+          ))}
+        </div>
+
+        {/* Thumbnail strip */}
+        <div className="slideshow-thumbs">
+          {PRODUCT_IMAGES.map((img, i) => (
+            <button
+              key={img.src}
+              className={`slideshow-thumb ${i === active ? 'active' : ''}`}
+              onClick={() => goTo(i)}
+              aria-label={img.label}
+            >
+              <img src={img.src} alt={img.label} loading="lazy" />
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MobileProductSlider() {
+  const [active, setActive] = useState(0);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setActive(prev => (prev + 1) % PRODUCT_IMAGES.length);
+    }, 3500);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <div className="mobile-only mobile-hero-slider mobile-product-slider" aria-label="Nouryum product showcase">
+      {PRODUCT_IMAGES.map((img, index) => (
+        <div
+          key={img.src}
+          className={`mobile-hero-card${index === active ? ' active' : ''}`}
+          role="img"
+          aria-label={img.label}
+          style={{
+            backgroundImage: `linear-gradient(180deg, rgba(10,16,10,0.10) 0%, rgba(10,16,10,0.60) 100%), url('${img.src}')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        >
+          <div className="mobile-hero-copy mobile-product-copy">
+            <span className="mobile-product-tag">🌿 Nouryum Essentials</span>
+            <h3>{img.label}</h3>
+            <button
+              className="mobile-product-shop-btn"
+              onClick={() => navigate('/products')}
+            >
+              Shop Now ↗
+            </button>
+          </div>
+        </div>
+      ))}
+
+      <div className="mobile-hero-dots" role="tablist" aria-label="Product slides">
+        {PRODUCT_IMAGES.map((_, index) => (
+          <button
+            key={index}
+            type="button"
+            className={`mobile-hero-dot${index === active ? ' active' : ''}`}
+            onClick={() => setActive(index)}
+            aria-label={`Go to product ${index + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 
 const quickLinks = [
   { label: 'Buy Ayurvedic Products', to: '/products', icon: '✦' },
+
   { label: 'Balance your Chakras',   to: '/chakras',  icon: '☸' },
   { label: 'Seasonal Diet Tips',     to: '/diet',     icon: '🌿', highlight: true },
   { label: 'Upload Previous Report', to: '/labs',     icon: '📄' },
@@ -38,9 +208,18 @@ const podcasts = [
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const { isLoggedIn } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+  const [heroSlides, setHeroSlides] = useState([]);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const handleSearch = () => {
+    if (!isLoggedIn) {
+      setShowLoginModal(true);
+      return;
+    }
+
     if (searchQuery.trim()) {
       navigate('/symptoms', { state: { initialQuery: searchQuery } });
     } else {
@@ -53,6 +232,50 @@ export default function HomePage() {
   };
 
   const [mobileTab, setMobileTab] = useState('home');
+  const displaySlides = heroSlides.length
+    ? heroSlides
+    : [{
+        id: 'fallback-slide',
+        title: 'Best Assessments',
+        subtitle: 'Recommended by Doctors',
+        image: 'https://zhbnmlroytjmdykkvwhn.storage.supabase.co/storage/v1/object/public/nouryum/site/hero_bg.png'
+      }];
+  const safeActiveSlide = Math.min(activeSlide, displaySlides.length - 1);
+
+  useEffect(() => {
+    let mounted = true;
+
+    api
+      .getHeroSlides()
+      .then((res) => {
+        if (!mounted) return;
+        setHeroSlides(Array.isArray(res.heroSlides) ? res.heroSlides : []);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setHeroSlides([]);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (heroSlides.length <= 1) return undefined;
+
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % heroSlides.length);
+    }, 3500);
+
+    return () => clearInterval(timer);
+  }, [heroSlides]);
+
+  useEffect(() => {
+    if (safeActiveSlide !== activeSlide) {
+      setActiveSlide(safeActiveSlide);
+    }
+  }, [activeSlide, safeActiveSlide]);
 
   return (
     <>
@@ -93,21 +316,8 @@ export default function HomePage() {
             </button>
           ))}
 
-          {/* Render blog-strip elements directly inside explore tab on mobile */}
-          <div className="mobile-only mobile-explore-widgets">
-            <h3 className="section-title">Seasonal Diet Tips</h3>
-            <div className="seasonal-card">
-              <div className="seasonal-card-img" />
-              <h4>Winter diet: what to eat and avoid</h4>
-              <p>Latest tips for the season</p>
-            </div>
-            <h3 className="section-title">Blogs & Podcasts</h3>
-            <div className="mobile-podcast-card">
-              <h4>Yoga for PCOD/PCOS</h4>
-              <p>June 8, 2025</p>
-              <div className="mobile-podcast-img" />
-            </div>
-          </div>
+
+
         </section>
 
         {/* ── Right: Hero image panel with search bar (mobile home tab) ── */}
@@ -122,7 +332,6 @@ export default function HomePage() {
           <div className="search-row-container">
             {/* Gold-border search bar (Figma) */}
             <div className="search-row" role="search">
-              <span className="search-icon mobile-only">🔍</span>
               <input
                 id="home-search"
                 placeholder="Tell us your Health concern!  Eg: diabetes, acne, indigestion"
@@ -137,6 +346,14 @@ export default function HomePage() {
             </div>
           </div>
 
+          <MobileProductSlider />
+
+          <div className="mobile-only mobile-home-highlights">
+            <div className="mobile-highlight-chip">Personalized Wellness Plans</div>
+            <div className="mobile-highlight-chip">Expert Guided Care</div>
+            <div className="mobile-highlight-chip">Natural Remedies</div>
+          </div>
+
           {/* Glassmorphism badge below the search bar */}
           <div className="hero-badge">
             <strong>Best Assessments, </strong>
@@ -144,6 +361,11 @@ export default function HomePage() {
           </div>
         </section>
       </main>
+
+      {/* ── Product Showcase — desktop only (mobile uses MobileProductSlider above) ── */}
+      <div className="desktop-only-block">
+        <ProductShowcase />
+      </div>
 
       {/* ── Blog & Podcast strip (hidden on mobile) ── */}
       <section className="blog-strip desktop-only-flex" id="blog-strip">
@@ -196,6 +418,20 @@ export default function HomePage() {
           </article>
         </div>
       </section>
+
+      <LoginRequiredModal
+        open={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLoggedIn={() => {
+          if (searchQuery.trim()) {
+            navigate('/symptoms', { state: { initialQuery: searchQuery } });
+            return;
+          }
+          navigate('/symptoms');
+        }}
+        title="Login required for disease search"
+        message="Please sign in with Google to search symptoms and get personalized disease insights."
+      />
     </>
   );
 }

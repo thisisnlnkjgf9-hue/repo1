@@ -12,6 +12,7 @@ import {
   adminGetTherapies, adminCreateTherapy, adminUpdateTherapy, adminDeleteTherapy,
   adminGetTherapyPackages, adminCreateTherapyPackage, adminUpdateTherapyPackage, adminDeleteTherapyPackage,
   adminGetTherapyBookings, adminUpdateTherapyBooking,
+  adminGetHeroSlides, adminCreateHeroSlide, adminUpdateHeroSlide, adminDeleteHeroSlide,
   adminDashboard
 } from '../controllers/admin.controller.js';
 import { uploadImage, uploadToCloud } from '../middlewares/upload.middleware.js';
@@ -71,5 +72,11 @@ router.put('/therapyBookings/:id', adminRequired, adminUpdateTherapyBooking);
 
 /* Feedbacks (read-only) */
 router.get('/feedbacks', adminRequired, adminGetFeedbacks);
+
+/* Home Hero Slides */
+router.get('/heroSlides', adminRequired, adminGetHeroSlides);
+router.post('/heroSlides', adminRequired, uploadImage.single('image'), uploadToCloud, adminCreateHeroSlide);
+router.put('/heroSlides/:id', adminRequired, uploadImage.single('image'), uploadToCloud, adminUpdateHeroSlide);
+router.delete('/heroSlides/:id', adminRequired, adminDeleteHeroSlide);
 
 export default router;

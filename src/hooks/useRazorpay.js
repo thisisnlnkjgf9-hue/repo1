@@ -3,22 +3,26 @@ import { api } from '../api';
 export function useRazorpay() {
   const RAZORPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY_ID || '';
 
-  const pay = async ({ amount, onSuccess, onDismiss, description = 'Nouryum Payment' }) => {
+  const pay = async ({ amount, onSuccess, onDismiss, onError, description = 'Nouryum Payment' }) => {
     try {
       const { order, key } = await api.createPaymentOrder({ amount, receipt: `rcpt_${Date.now()}` });
 
-      const activeKey = RAZORPAY_KEY || key || 'demo_key';
+      const activeKey = RAZORPAY_KEY || key;
 
-      if (order.mock || !window.Razorpay) {
-        /* Demo / mock mode — simulate success immediately */
-        if (onSuccess) {
-          onSuccess({
-            razorpay_order_id: order.id,
-            razorpay_payment_id: `mock_pay_${Date.now()}`,
-            razorpay_signature: 'mock_signature'
-          });
-        }
-        return;
+      if (!activeKey) {
+        throw new Error('Razorpay key is missing. Please contact support.');
+      }
+
+      if (!window.Razorpay) {
+        throw new Error('Razorpay SDK failed to load. Please check your internet and try again.');
+      }
+
+      if (!order?.id) {
+        throw new Error('Unable to initialize payment order. Please try again.');
+      }
+
+      if (order?.mock) {
+        throw new Error('Payment gateway is not configured correctly.');
       }
 
       const options = {
@@ -36,7 +40,10 @@ export function useRazorpay() {
               razorpay_signature: response.razorpay_signature
             });
           } catch {
-            /* verification failed, but payment may still be valid */
+            if (onError) {
+              onError(new Error('Payment verification failed. Amount not charged successfully.'));
+            }
+            return;
           }
 
           if (onSuccess) {
@@ -56,16 +63,16 @@ export function useRazorpay() {
       };
 
       const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', () => {
+        if (onError) {
+          onError(new Error('Payment failed. No order was placed.'));
+        }
+      });
       rzp.open();
     } catch (error) {
       console.error('Razorpay Error:', error);
-      /* Fallback: treat as success in demo mode */
-      if (onSuccess) {
-        onSuccess({
-          razorpay_order_id: `fallback_${Date.now()}`,
-          razorpay_payment_id: `fallback_pay_${Date.now()}`,
-          razorpay_signature: ''
-        });
+      if (onError) {
+        onError(error);
       }
     }
   };

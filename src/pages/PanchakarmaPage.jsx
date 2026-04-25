@@ -3,13 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { api } from '../api';
+import { useRazorpay } from '../hooks/useRazorpay';
+import LoginRequiredModal from '../components/LoginRequiredModal';
 import NavTabs from '../components/NavTabs';
 
 export default function PanchakarmaPage() {
-  const { user } = useAuth();
+  const { user, isLoggedIn } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const userId = user?.id || user?.userId;
+  const { pay } = useRazorpay();
 
   const [therapies, setTherapies] = useState([]);
   const [packages, setPackages] = useState([]);
@@ -17,6 +20,8 @@ export default function PanchakarmaPage() {
   const [selectedTherapy, setSelectedTherapy] = useState(null);
   const [bookingModal, setBookingModal] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const [form, setForm] = useState({
     customerName: user?.name || '',
@@ -38,24 +43,54 @@ export default function PanchakarmaPage() {
 
   const handleBook = async (e) => {
     e.preventDefault();
+    if (processingPayment) return;
+
+    if (!isLoggedIn) {
+      setShowLoginModal(true);
+      return;
+    }
+
     if (!form.customerName || !form.customerEmail || !form.customerPhone) {
       toast.error('Please fill all fields');
       return;
     }
-    try {
-      await api.bookTherapy({
-        ...form,
-        packageId: bookingModal.packageId || '',
-        packageName: bookingModal.packageName || '',
-        therapyId: bookingModal.therapyId || '',
-        therapyName: bookingModal.therapyName || '',
-        totalPriceInr: bookingModal.price
-      });
-      toast.success('Booking confirmed! We will contact you soon.');
-      setBookingModal(null);
-    } catch (err) {
-      toast.error(err.message || 'Booking failed');
-    }
+
+    setProcessingPayment(true);
+
+    pay({
+      amount: Number(bookingModal?.price || 0),
+      description: `Therapy Booking - ${bookingModal?.packageName || bookingModal?.therapyName || 'Nouryum'}`,
+      onSuccess: async (paymentData) => {
+        try {
+          await api.bookTherapy({
+            ...form,
+            userId,
+            packageId: bookingModal.packageId || '',
+            packageName: bookingModal.packageName || '',
+            therapyId: bookingModal.therapyId || '',
+            therapyName: bookingModal.therapyName || '',
+            totalPriceInr: bookingModal.price,
+            paymentMethod: 'razorpay',
+            razorpayOrderId: paymentData.razorpay_order_id,
+            razorpayPaymentId: paymentData.razorpay_payment_id,
+            razorpaySignature: paymentData.razorpay_signature
+          });
+          toast.success('Booking confirmed!');
+          setBookingModal(null);
+        } catch (err) {
+          toast.error(err.message || 'Booking failed after payment verification.');
+        } finally {
+          setProcessingPayment(false);
+        }
+      },
+      onDismiss: () => {
+        setProcessingPayment(false);
+      },
+      onError: (error) => {
+        toast.error(error?.message || 'Payment failed. Booking not created.');
+        setProcessingPayment(false);
+      }
+    });
   };
 
   const resultPromises = [
@@ -233,11 +268,18 @@ export default function PanchakarmaPage() {
               </label>
 
               <button type="submit" className="pk-book-btn" style={{ width: '100%', marginTop: 16 }}>
-                Confirm Booking
+                {processingPayment ? 'Processing Payment...' : 'Pay & Confirm Booking'}
               </button>
             </form>
           </div>
         )}
+
+        <LoginRequiredModal
+          open={showLoginModal}
+          onClose={() => setShowLoginModal(false)}
+          title="Login required for therapy booking"
+          message="Please sign in with Google to pay and confirm your therapy booking."
+        />
       </main>
     </>
   );

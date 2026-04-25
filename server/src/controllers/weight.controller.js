@@ -8,12 +8,14 @@ import { User } from '../models/user.model.js';
 import { Doctor } from '../models/doctor.model.js';
 import { Product } from '../models/product.model.js';
 import { runGeminiJson } from '../services/gemini.service.js';
+import { verifyPaymentSignature, isRazorpayConfigured } from '../services/razorpay.service.js';
 import {
   digestionQuestions,
   lifestyleQuestions,
   sleepQuestions
 } from '../data/weightAndTherapy.js';
-import { prakritiQuestions } from '../data/store.js';
+import { isMongoConnected } from '../config/db.js';
+import { prakritiQuestions, reportUploads, users } from '../data/store.js';
 import { pickPrakriti } from '../services/recommendation.service.js';
 
 /* ═══════════════════════════════════════════════════════
@@ -44,13 +46,27 @@ export async function bookTherapy(req, res) {
     totalPriceInr,
     paymentMethod = 'razorpay',
     razorpayOrderId = '',
-    razorpayPaymentId = ''
+    razorpayPaymentId = '',
+    razorpaySignature = ''
   } = req.body;
 
   const userId = req.user?.userId;
 
   if (!customerName || !customerEmail || !customerPhone || !totalPriceInr) {
     return res.status(400).json({ message: 'customerName, customerEmail, customerPhone and totalPriceInr are required.' });
+  }
+
+  if (!isRazorpayConfigured()) {
+    return res.status(503).json({ message: 'Payment gateway is not configured.' });
+  }
+
+  if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+    return res.status(400).json({ message: 'Successful Razorpay payment is required before booking.' });
+  }
+
+  const isPaymentValid = verifyPaymentSignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+  if (!isPaymentValid) {
+    return res.status(400).json({ message: 'Payment verification failed. Booking was not created.' });
   }
 
   const booking = await TherapyBooking.create({
@@ -185,7 +201,29 @@ export async function submitWeightAssessment(req, res) {
   };
 
   const aiReport = await runGeminiJson(
-    `Generate a comprehensive Ayurvedic weight management report. Patient prakriti: ${prakriti}. Assessment summary: ${JSON.stringify(answerSummary)}. Return JSON with keys: title, overallHealth, agniStatus, doshaImbalance, dietPlan (object with breakfast/lunch/dinner/snacks), herbalSupport (array of {name,timing,purpose}), lifestyleRecommendations (array of strings), dinacharyaTips (array of strings), cautionNote. Keep advice safe, non-diagnostic, Ayurveda-focused.`,
+    `You are an authoritative Āyurvedic wellness scholar composing a Svasthavrtta-style weight management report. Patient Prakṛti (constitutional type): ${prakriti}. Assessment summary: ${JSON.stringify(answerSummary)}.
+
+Return ONLY JSON with keys: title, overallHealth, agniStatus, doshaImbalance, dietPlan, herbalSupport, lifestyleRecommendations, dinacharyaTips, cautionNote.
+
+title: a dignified clinical heading (e.g., "Āyurvedic Weight Management Report — Kapha-Dominant Mandāgni with Medo Vṛddhi").
+
+overallHealth: one of "Good" | "Moderate" | "Needs Attention" with a 1-sentence Āyurvedic rationale.
+
+agniStatus: name the Agni type using the classical four (Sama, Viṣama, Tīkṣṇa, Manda) with the Sanskrit term, its plain-language meaning in parentheses, and a 1-sentence clinical implication.
+
+doshaImbalance: 2–3 sentences naming the predominant Doṣa vṛddhi (aggravation) with its Sanskrit name + plain meaning, how it relates to Medo Dhātu (adipose tissue) and weight, and Āma sañcaya (metabolic residue) if relevant.
+
+dietPlan: object with keys breakfast, lunch, dinner, snacks. Each value is a specific 1–2 sentence Pathya (beneficial) meal prescription written in the Svasthavrtta style, naming food items with their quality (e.g., "Laghu (light), Rukṣa (dry/rough)") and rationale.
+
+herbalSupport: array of 4–5 objects {name, timing, purpose}. Name should include Sanskrit name + common name. Timing should be specific (e.g., "morning, empty stomach, with warm water"). Purpose should state the Āyurvedic action (e.g., "Deepana-Pachana — kindles Agni and reduces Āma").
+
+lifestyleRecommendations: array of 5–6 strings. Each should name a classical practice (Udvartana, Vyāyāma, Dīnacaryā, etc.) with a parenthetical explanation, followed by a specific practical instruction.
+
+dinacharyaTips: array of 5 strings structured as classical Dīnacaryā (daily regimen) prescriptions with time references and Āyurvedic rationale.
+
+cautionNote: one composed sentence advising consultation with a certified Āyurvedic physician.
+
+Keep the entire output safe, non-diagnostic, and clinically responsible.`,
     fallbackReport
   );
 
@@ -341,10 +379,44 @@ export async function getWeightRecommendations(req, res) {
 export async function getUserReports(req, res) {
   const userId = req.params.userId || req.user?.userId;
 
-  const user = await User.findById(userId).lean();
-  const assessments = await WeightAssessment.find({ userId }).sort({ createdAt: -1 }).lean();
-  const therapyBookings = await TherapyBooking.find({ userId }).sort({ createdAt: -1 }).lean();
-  const uploadedReports = await ReportUpload.find({ userId }).sort({ createdAt: -1 }).lean();
+  if (!isMongoConnected()) {
+    const user = users.find((u) => u.id === userId || u.email === req.user?.email);
+    const uploadedReports = reportUploads.filter((r) => r.userId === userId || r.email === req.user?.email);
+
+    return res.json({
+      reports: user?.assessmentReports || [],
+      uploadedReports,
+      assessments: [],
+      therapyBookings: []
+    });
+  }
+
+  let user = await User.findById(userId).lean().catch(() => null);
+  if (!user && req.user?.email) {
+    user = await User.findOne({ email: req.user.email }).lean().catch(() => null);
+  }
+
+  const candidateUserIds = Array.from(
+    new Set([
+      userId,
+      req.user?.userId,
+      user?._id?.toString()
+    ].filter(Boolean))
+  );
+
+  const assessments = await WeightAssessment.find({ userId: { $in: candidateUserIds } }).sort({ createdAt: -1 }).lean();
+  const therapyBookings = await TherapyBooking.find({
+    $or: [
+      { userId: { $in: candidateUserIds } },
+      ...(req.user?.email ? [{ customerEmail: req.user.email }] : [])
+    ]
+  }).sort({ createdAt: -1 }).lean();
+  const uploadedReports = await ReportUpload.find({
+    $or: [
+      { userId: { $in: candidateUserIds } },
+      ...(req.user?.email ? [{ email: req.user.email }] : [])
+    ]
+  }).sort({ createdAt: -1 }).lean();
 
   res.json({
     reports: (user?.assessmentReports || []),

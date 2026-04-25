@@ -17,6 +17,7 @@ import {
   getDietTips,
   getSeasonalDietTips,
   getDoctors,
+  getHeroSlides,
   getFeedbacks,
   getLabPackage,
   getMe,
@@ -53,11 +54,20 @@ const router = Router();
 /* ── Public routes ── */
 router.get('/health', health);
 router.post('/auth/google', authGoogle);
+router.get('/hero-slides', getHeroSlides);
+router.get('/blogs', getBlogs);
+router.get('/blogs/:id', getBlogById);
+router.get('/podcasts', getPodcasts);
+router.get('/feedback', getFeedbacks);
+router.get('/doctors', getDoctors);
+router.get('/products', getProducts);
+router.get('/prakriti/questions', getPrakritiQuestions);
+router.get('/therapies', getTherapies);
+router.get('/therapy-packages', getTherapyPackages);
 
 /* ── Protected routes (require login) ── */
 router.get('/auth/me', authRequired, getMe);
 
-router.get('/prakriti/questions', authRequired, getPrakritiQuestions);
 router.post('/prakriti/submit', authRequired, submitPrakriti);
 router.get('/diet-tips', authRequired, getDietTips);
 router.get('/diet-tips/seasonal', authRequired, getSeasonalDietTips);
@@ -69,11 +79,9 @@ router.post('/symptoms/generate-questions', authRequired, generateSymptomQuestio
 router.post('/symptoms/analyze-disease', authRequired, analyzeDisease);
 router.get('/recommendations', authRequired, recommendations);
 
-router.get('/doctors', authRequired, getDoctors);
 router.post('/bookings', authRequired, createBooking);
 router.get('/bookings/:userId', authRequired, getBookings);
 
-router.get('/products', authRequired, getProducts);
 router.get('/cart/:userId', authRequired, getCart);
 router.post('/cart', authRequired, addToCart);
 router.post('/cart/remove', authRequired, removeFromCart);
@@ -83,21 +91,14 @@ router.get('/orders/:userId', authRequired, getOrders);
 router.post('/payments/create-order', authRequired, createPaymentOrder);
 router.post('/payments/verify', authRequired, verifyPayment);
 
-router.get('/blogs', authRequired, getBlogs);
-router.get('/blogs/:id', authRequired, getBlogById);
-router.get('/podcasts', authRequired, getPodcasts);
-
 import { uploadReportPdf, uploadToCloud } from '../middlewares/upload.middleware.js';
 
 router.get('/labs/packages', authRequired, getLabPackage);
 router.post('/reports/upload', authRequired, uploadReportPdf.single('file'), uploadToCloud, uploadMedicalReport);
 
-router.get('/feedback', authRequired, getFeedbacks);
 router.post('/feedback', authRequired, submitFeedback);
 
 /* ── Panchakarma Therapy routes ── */
-router.get('/therapies', authRequired, getTherapies);
-router.get('/therapy-packages', authRequired, getTherapyPackages);
 router.post('/therapy-bookings', authRequired, bookTherapy);
 router.get('/therapy-bookings/:userId', authRequired, getTherapyBookings);
 

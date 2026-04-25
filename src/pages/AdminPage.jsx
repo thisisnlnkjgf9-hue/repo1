@@ -86,7 +86,7 @@ function FormModal({ title, fields, initial, onSubmit, onClose }) {
   );
 }
 
-const TABS = ['dashboard', 'blogs', 'products', 'doctors', 'therapies', 'therapyPackages', 'orders', 'bookings', 'therapyBookings', 'users', 'feedbacks'];
+const TABS = ['dashboard', 'blogs', 'products', 'doctors', 'heroSlides', 'therapies', 'therapyPackages', 'orders', 'bookings', 'therapyBookings', 'users', 'feedbacks'];
 
 export default function AdminPage() {
   const toast = useToast();
@@ -236,6 +236,13 @@ export default function AdminPage() {
     { key: 'includes', label: 'Includes (JSON Array String)', type: 'textarea' },
     { key: 'extras', label: 'Extras (comma-separated)', type: 'textarea' },
   ];
+  const heroSlideFields = [
+    { key: 'title', label: 'Title' },
+    { key: 'subtitle', label: 'Subtitle' },
+    { key: 'order', label: 'Display Order', type: 'number' },
+    { key: 'isActive', label: 'Active', type: 'select', options: ['true', 'false'] },
+    { key: 'image', label: 'Slide Image', type: 'file', required: true },
+  ];
   const orderEditFields = [
     { key: 'status', label: 'Order Status', type: 'select', options: ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Delivered', 'Cancelled'] },
     { key: 'shipmentStatus', label: 'Shipment Tracking', type: 'textarea' }
@@ -257,6 +264,13 @@ export default function AdminPage() {
   const doctorCols = [
     { key: 'name', label: 'Name' }, { key: 'specialization', label: 'Specialization' },
     { key: 'consultationFee', label: 'Fee' }, { key: 'image', label: 'Photo' }
+  ];
+  const heroSlideCols = [
+    { key: 'title', label: 'Title' },
+    { key: 'subtitle', label: 'Subtitle' },
+    { key: 'order', label: 'Order' },
+    { key: 'isActive', label: 'Active' },
+    { key: 'image', label: 'Image' }
   ];
   const therapyCols = [
     { key: 'name', label: 'Name' }, { key: 'durationMinutes', label: 'Duration (m)' },
@@ -303,6 +317,7 @@ export default function AdminPage() {
           {TABS.map(t => (
             <button key={t} className={`admin-nav-btn${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
               {t === 'dashboard' && '📊'} {t === 'blogs' && '📝'} {t === 'products' && '🛒'}
+              {t === 'heroSlides' && '🎞️'}
               {t === 'doctors' && '👨‍⚕️'} {t === 'therapies' && '🧘'} {t === 'therapyPackages' && '🏷️'}
               {t === 'orders' && '📦'} {t === 'users' && '👥'}
               {t === 'bookings' && '📅'} {t === 'therapyBookings' && '📆'} {t === 'feedbacks' && '💬'}
@@ -317,7 +332,7 @@ export default function AdminPage() {
       <section className="admin-content">
         <header className="admin-header">
           <h1>{tab.charAt(0).toUpperCase() + tab.slice(1).replace(/([A-Z])/g, ' $1')}</h1>
-          {['blogs', 'products', 'doctors', 'therapies', 'therapyPackages'].includes(tab) && (
+          {['blogs', 'products', 'doctors', 'heroSlides', 'therapies', 'therapyPackages'].includes(tab) && (
             <button className="admin-btn primary" onClick={() => setModal({ type: 'create', entity: tab })}>
               + Add {tab}
             </button>
@@ -360,6 +375,10 @@ export default function AdminPage() {
         {tab === 'doctors' && <DataTable columns={doctorCols} rows={data.doctors || []}
           onEdit={r => setModal({ type: 'edit', entity: 'doctors', initial: r })}
           onDelete={id => handleDelete('doctors', id)} />}
+
+        {tab === 'heroSlides' && <DataTable columns={heroSlideCols} rows={data.heroSlides || []}
+          onEdit={r => setModal({ type: 'edit', entity: 'heroSlides', initial: { ...r, isActive: String(r.isActive ?? true) } })}
+          onDelete={id => handleDelete('heroSlides', id)} />}
           
         {tab === 'therapies' && <DataTable columns={therapyCols} rows={data.therapies || []}
           onEdit={r => setModal({ type: 'edit', entity: 'therapies', initial: r })}
@@ -406,6 +425,14 @@ export default function AdminPage() {
       {modal && modal.type === 'edit' && modal.entity === 'doctors' && (
         <FormModal title="Edit Doctor" fields={doctorFields} initial={modal.initial} onClose={() => setModal(null)}
           onSubmit={fd => handleUpdate('doctors', modal.initial._id || modal.initial.id, fd)} />
+      )}
+      {modal && modal.type === 'create' && modal.entity === 'heroSlides' && (
+        <FormModal title="New Hero Slide" fields={heroSlideFields} initial={{ isActive: 'true', order: 0 }} onClose={() => setModal(null)}
+          onSubmit={fd => handleCreate('heroSlides', fd)} />
+      )}
+      {modal && modal.type === 'edit' && modal.entity === 'heroSlides' && (
+        <FormModal title="Edit Hero Slide" fields={heroSlideFields} initial={modal.initial} onClose={() => setModal(null)}
+          onSubmit={fd => handleUpdate('heroSlides', modal.initial._id || modal.initial.id, fd)} />
       )}
       {modal && modal.type === 'create' && modal.entity === 'therapies' && (
         <FormModal title="New Therapy" fields={therapyFields} onClose={() => setModal(null)}

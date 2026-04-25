@@ -91,6 +91,7 @@ export const api = {
   getBlogs: () => request('/blogs'),
   getBlogById: (id) => request(`/blogs/${id}`),
   getPodcasts: () => request('/podcasts'),
+  getHeroSlides: () => request('/hero-slides'),
   getLabPackage: () => request('/labs/packages'),
   uploadMedicalReport: (payload) => request('/reports/upload', { method: 'POST', body: payload }),
   getFeedbacks: () => request('/feedback'),

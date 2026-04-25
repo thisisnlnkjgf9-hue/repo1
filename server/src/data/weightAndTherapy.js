@@ -61,6 +61,23 @@ export const therapies = [
 
 export const therapyPackages = [
   {
+    name: 'Razorpay Test Therapy Package (Rs 1)',
+    slug: 'razorpay-test-therapy-package-rs-1',
+    tagline: 'Use only for payment testing',
+    badge: 'Test',
+    includes: [
+      { day: 'Test Session', therapies: ['Snehan'] }
+    ],
+    totalSessions: 1,
+    durationDays: 1,
+    actualPriceInr: 99,
+    offerPriceInr: 1,
+    resultPromise: 'Razorpay test payment package',
+    extras: ['For QA/testing only'],
+    bestFor: 'Payment gateway testing',
+    featured: false
+  },
+  {
     name: 'Quick Detox Starter',
     slug: 'quick-detox-starter',
     tagline: 'For first-time users',

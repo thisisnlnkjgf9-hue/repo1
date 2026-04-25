@@ -9,6 +9,7 @@ import { Feedback } from '../models/feedback.model.js';
 import { Therapy } from '../models/therapy.model.js';
 import { TherapyPackage } from '../models/therapyPackage.model.js';
 import { TherapyBooking } from '../models/therapyBooking.model.js';
+import { HeroSlide } from '../models/heroSlide.model.js';
 import { ADMIN_USERNAME, ADMIN_PASSWORD, JWT_SECRET } from '../config/env.js';
 import { isMongoConnected } from '../config/db.js';
 import {
@@ -16,7 +17,8 @@ import {
   products as memProducts,
   doctors as memDoctors,
   orders as memOrders,
-  users as memUsers
+  users as memUsers,
+  heroSlides as memHeroSlides
 } from '../data/store.js';
 
 /* ───── Admin Login ───── */
@@ -252,6 +254,80 @@ export async function adminGetFeedbacks(_req, res) {
     return res.json({ feedbacks });
   }
   return res.json({ feedbacks: [] });
+}
+
+/* ═══════════════════════════════════════════════
+   HERO SLIDES CRUD
+   ═══════════════════════════════════════════════ */
+export async function adminGetHeroSlides(_req, res) {
+  if (isMongoConnected()) {
+    const heroSlides = await HeroSlide.find().sort({ order: 1, createdAt: -1 }).lean();
+    return res.json({ heroSlides });
+  }
+
+  const slides = [...memHeroSlides].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+  return res.json({ heroSlides: slides });
+}
+
+export async function adminCreateHeroSlide(req, res) {
+  const { title = '', subtitle = '', order = 0, isActive = 'true' } = req.body;
+  const image = req.file ? (req.file.cloudUrl || `/uploads/${req.file.filename}`) : (req.body.image || '');
+
+  if (!image) {
+    return res.status(400).json({ message: 'image is required.' });
+  }
+
+  const payload = {
+    title,
+    subtitle,
+    image,
+    order: Number(order) || 0,
+    isActive: String(isActive) !== 'false'
+  };
+
+  if (isMongoConnected()) {
+    const heroSlide = await HeroSlide.create(payload);
+    return res.status(201).json({ heroSlide });
+  }
+
+  const heroSlide = {
+    id: `hs_${Date.now()}`,
+    ...payload
+  };
+  memHeroSlides.push(heroSlide);
+  return res.status(201).json({ heroSlide });
+}
+
+export async function adminUpdateHeroSlide(req, res) {
+  const { id } = req.params;
+  const updates = { ...req.body };
+  if (req.file) updates.image = req.file.cloudUrl || `/uploads/${req.file.filename}`;
+  if (updates.order !== undefined) updates.order = Number(updates.order) || 0;
+  if (updates.isActive !== undefined) updates.isActive = String(updates.isActive) !== 'false';
+
+  if (isMongoConnected()) {
+    const heroSlide = await HeroSlide.findByIdAndUpdate(id, updates, { new: true });
+    if (!heroSlide) return res.status(404).json({ message: 'Hero slide not found.' });
+    return res.json({ heroSlide });
+  }
+
+  const index = memHeroSlides.findIndex((slide) => slide.id === id || slide._id === id);
+  if (index === -1) return res.status(404).json({ message: 'Hero slide not found.' });
+  memHeroSlides[index] = { ...memHeroSlides[index], ...updates };
+  return res.json({ heroSlide: memHeroSlides[index] });
+}
+
+export async function adminDeleteHeroSlide(req, res) {
+  const { id } = req.params;
+
+  if (isMongoConnected()) {
+    await HeroSlide.findByIdAndDelete(id);
+    return res.json({ message: 'Hero slide deleted.' });
+  }
+
+  const index = memHeroSlides.findIndex((slide) => slide.id === id || slide._id === id);
+  if (index !== -1) memHeroSlides.splice(index, 1);
+  return res.json({ message: 'Hero slide deleted.' });
 }
 
 /* ═══════════════════════════════════════════════

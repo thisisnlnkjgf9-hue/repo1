@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
+import LoginRequiredModal from '../components/LoginRequiredModal';
 
 
 /* ── Figma-matched static follow-up questions ── */
@@ -50,14 +52,14 @@ export default function SymptomFormPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
+  const { isLoggedIn } = useAuth();
   const initialQuery = location.state?.initialQuery || '';
 
   const [disease, setDisease] = useState(initialQuery || '');
   const [diseaseSubmitted, setDiseaseSubmitted] = useState(false);
   const [answers, setAnswers] = useState({});
   const [otherCondition, setOtherCondition] = useState('');
-  const [searchInfo, setSearchInfo] = useState(null);
-  const [loadingSearch, setLoadingSearch] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   /* Build the full answer payload for remedies page */
   const answerList = useMemo(
@@ -72,27 +74,21 @@ export default function SymptomFormPage() {
     [answers]
   );
 
-  /* Step 1 — search the disease, show follow-up questions */
-  const searchDisease = async () => {
+  /* Step 1 — submit disease and show follow-up questions */
+  const searchDisease = () => {
+    if (!isLoggedIn) {
+      setShowLoginModal(true);
+      return;
+    }
+
     if (!disease.trim()) {
       toast.warning('Please enter a disease or health concern.');
       return;
     }
 
-    setLoadingSearch(true);
     setDiseaseSubmitted(true);
     setAnswers({});
-
-    try {
-      const searchData = await api.aiSearch({ query: disease, prakriti: 'vata' });
-      setSearchInfo(searchData);
-      toast.success(`Results found for "${disease}"`);
-    } catch {
-      /* Still show questions even if AI search fails */
-      toast.info(`Showing assessment for "${disease}"`);
-    } finally {
-      setLoadingSearch(false);
-    }
+    toast.info(`Assessment started for "${disease}"`);
   };
 
   /* Step 2 — submit answers and get remedies */
@@ -106,8 +102,7 @@ export default function SymptomFormPage() {
     navigate('/remedies', {
       state: {
         disease,
-        answers: answerList,
-        searchInfo,
+        answers: answerList
       },
     });
   };
@@ -160,15 +155,6 @@ export default function SymptomFormPage() {
           </button>
         </div>
 
-        {/* AI Summary */}
-        {searchInfo && (
-          <article className="ai-summary">
-            <h3>AI Insight</h3>
-            <p>{searchInfo.summary}</p>
-            {searchInfo.caution && <p className="caution-text">{searchInfo.caution}</p>}
-          </article>
-        )}
-
         {/* Figma: "Answer some questions..." heading + progress bar */}
         {diseaseSubmitted && (
           <>
@@ -179,8 +165,6 @@ export default function SymptomFormPage() {
               </div>
               <span className="progress-label">{answeredCount} of {FOLLOWUP_QUESTIONS.length} answered</span>
             </div>
-
-            {loadingSearch && <p className="loading-text">Preparing your assessment...</p>}
 
             {/* Questions list from Figma */}
             <div className="generated-questions figma-questions">
@@ -272,6 +256,14 @@ export default function SymptomFormPage() {
           </div>
         )}
       </section>
+
+      <LoginRequiredModal
+        open={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLoggedIn={searchDisease}
+        title="Login required for disease search"
+        message="Please sign in with Google to search symptoms and continue this assessment."
+      />
     </main>
   );
 }

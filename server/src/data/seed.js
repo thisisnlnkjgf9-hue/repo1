@@ -35,6 +35,16 @@ export async function seedDatabase() {
       console.log('Seeded products.');
     }
 
+    const testProductName = 'Razorpay Test Product (Rs 1)';
+    const hasTestProduct = await Product.exists({ name: testProductName });
+    if (!hasTestProduct) {
+      const testProduct = products.find((item) => item.name === testProductName);
+      if (testProduct) {
+        await Product.create(testProduct);
+        console.log('Seeded Razorpay test product.');
+      }
+    }
+
     const blogCount = await Blog.countDocuments();
     if (blogCount === 0) {
       await Blog.insertMany(blogs);
@@ -44,12 +54,6 @@ export async function seedDatabase() {
     const feedbackCount = await Feedback.countDocuments();
     if (feedbackCount === 0) {
       await Feedback.insertMany([
-        {
-          name: 'Pallavi Pal',
-          rating: 5,
-          comment:
-            'Nouryum helped me understand my Prakriti and gave me a personalized diet plan. Wonderful platform!'
-        },
         {
           name: 'Zara Khan',
           rating: 5,
@@ -78,6 +82,16 @@ export async function seedDatabase() {
     if (packageCount === 0) {
       await TherapyPackage.insertMany(therapyPackages);
       console.log('Seeded therapy packages.');
+    }
+
+    const testPackageSlug = 'razorpay-test-therapy-package-rs-1';
+    const hasTestPackage = await TherapyPackage.exists({ slug: testPackageSlug });
+    if (!hasTestPackage) {
+      const testPackage = therapyPackages.find((item) => item.slug === testPackageSlug);
+      if (testPackage) {
+        await TherapyPackage.create(testPackage);
+        console.log('Seeded Razorpay test therapy package.');
+      }
     }
   } catch (error) {
     console.warn('Seed error (non-critical):', error.message);

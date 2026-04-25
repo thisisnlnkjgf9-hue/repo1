@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
+import LoginRequiredModal from '../components/LoginRequiredModal';
 
 export default function PrakritiPage() {
-  const { user, setUser } = useAuth();
+  const { user, setUser, isLoggedIn } = useAuth();
   const userId = user?.id || user?.userId || 'u1';
   const [questions, setQuestions] = useState([]);
   const [loadingQuestions, setLoadingQuestions] = useState(true);
@@ -14,6 +15,7 @@ export default function PrakritiPage() {
   const [details, setDetails] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   useEffect(() => {
     api.getPrakritiQuestions()
@@ -28,6 +30,37 @@ export default function PrakritiPage() {
     return ((index + 1) / questions.length) * 100;
   }, [index, questions.length]);
 
+  const doshaChart = useMemo(() => {
+    if (!details) return null;
+
+    const scoreMap = {
+      vata: 0,
+      pitta: 0,
+      kapha: 0
+    };
+
+    if (details.dominant && scoreMap[details.dominant] !== undefined) {
+      scoreMap[details.dominant] = details.dominantScore || 0;
+    }
+    if (details.second && scoreMap[details.second] !== undefined) {
+      scoreMap[details.second] = details.secondScore || 0;
+    }
+    if (details.third && scoreMap[details.third] !== undefined) {
+      scoreMap[details.third] = details.thirdScore || 0;
+    }
+
+    const vata = Math.max(0, Math.min(100, scoreMap.vata));
+    const pitta = Math.max(0, Math.min(100 - vata, scoreMap.pitta));
+    const kapha = Math.max(0, 100 - vata - pitta);
+
+    const pittaEnd = vata + pitta;
+
+    return {
+      scoreMap,
+      chartBackground: `conic-gradient(#8d6ad1 0 ${vata}%, #ef9143 ${vata}% ${pittaEnd}%, #5ca96c ${pittaEnd}% 100%)`
+    };
+  }, [details]);
+
   const selectOption = (value) => {
     setAnswers((prev) => ({ ...prev, [question.id]: value }));
   };
@@ -35,6 +68,11 @@ export default function PrakritiPage() {
   const onNext = async () => {
     if (index < questions.length - 1) {
       setIndex((prev) => prev + 1);
+      return;
+    }
+
+    if (!isLoggedIn) {
+      setShowLoginModal(true);
       return;
     }
 
@@ -131,11 +169,11 @@ export default function PrakritiPage() {
               </button>
               <button
                 type="button"
-                className="next-btn"
+                className={index < questions.length - 1 ? 'next-btn' : 'next-btn prakriti-submit-btn'}
                 onClick={onNext}
                 disabled={submitting}
               >
-                {submitting ? 'Saving...' : index < questions.length - 1 ? 'Next' : 'Submit'}
+                {submitting ? 'Saving...' : index < questions.length - 1 ? 'Next' : 'Save My Prakriti Result'}
               </button>
             </div>
           </>
@@ -143,47 +181,48 @@ export default function PrakritiPage() {
 
         {result && <h3 className="success-text" style={{ marginTop: 24, textAlign: 'center' }}>{result}</h3>}
         {details && (
-          <div style={{ marginTop: 20, padding: 20, background: 'var(--panel)', borderRadius: 12 }}>
-            <h4 style={{ marginBottom: 16 }}>Prakriti Breakdown</h4>
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontWeight: 600 }}>Dominant ({details.dominant.toUpperCase()})</span>
-                <span>{details.dominantScore}%</span>
+          <div className="prakriti-result-card">
+            <h4>Prakriti Breakdown</h4>
+
+            <div className="prakriti-chart-layout">
+              <div className="prakriti-donut" style={{ background: doshaChart?.chartBackground || '#ddd' }}>
+                <div className="prakriti-donut-hole">
+                  <span className="prakriti-donut-title">Dominant</span>
+                  <strong>{details.dominant?.toUpperCase()}</strong>
+                  <span className="prakriti-donut-score">{details.dominantScore}%</span>
+                </div>
               </div>
-              <div style={{ width: '100%', height: 12, background: 'var(--border)', borderRadius: 6, overflow: 'hidden' }}>
-                <div style={{ width: `${details.dominantScore}%`, height: '100%', background: 'var(--primary)', borderRadius: 6 }} />
+
+              <div className="prakriti-score-grid">
+                <div className="prakriti-score-row">
+                  <span className="dosha-chip vata">Vata</span>
+                  <strong>{doshaChart?.scoreMap?.vata || 0}%</strong>
+                </div>
+                <div className="prakriti-score-row">
+                  <span className="dosha-chip pitta">Pitta</span>
+                  <strong>{doshaChart?.scoreMap?.pitta || 0}%</strong>
+                </div>
+                <div className="prakriti-score-row">
+                  <span className="dosha-chip kapha">Kapha</span>
+                  <strong>{doshaChart?.scoreMap?.kapha || 0}%</strong>
+                </div>
               </div>
             </div>
-            
-            {details.second && details.secondScore > 0 && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span>Secondary ({details.second.toUpperCase()})</span>
-                  <span>{details.secondScore}%</span>
-                </div>
-                <div style={{ width: '100%', height: 10, background: 'var(--border)', borderRadius: 5, overflow: 'hidden' }}>
-                  <div style={{ width: `${details.secondScore}%`, height: '100%', background: '#ff9800', borderRadius: 5 }} />
-                </div>
-              </div>
-            )}
-            
-            {details.third && details.thirdScore > 0 && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ color: 'var(--muted)' }}>Tertiary ({details.third.toUpperCase()})</span>
-                  <span style={{ color: 'var(--muted)' }}>{details.thirdScore}%</span>
-                </div>
-                <div style={{ width: '100%', height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
-                  <div style={{ width: `${details.thirdScore}%`, height: '100%', background: 'var(--muted)', borderRadius: 4 }} />
-                </div>
-              </div>
-            )}
-            <p style={{ marginTop: 16, fontSize: '14px', color: 'var(--muted)', lineHeight: 1.5 }}>
+
+            <p className="prakriti-result-note">
               Based on your answers, your constitution leans heavily towards <b>{details.dominant.toUpperCase()}</b>{details.secondScore >= 20 ? `, with a strong secondary influence from ${details.second.toUpperCase()}` : ''}. This means you should follow a primarily {details.dominant.toUpperCase()}-pacifying lifestyle and diet.
             </p>
           </div>
         )}
       </section>
+
+      <LoginRequiredModal
+        open={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLoggedIn={onNext}
+        title="Login required to save assessment"
+        message="You can complete the quiz as guest, but please sign in with Google to save your Prakriti result."
+      />
     </main>
   );
 }

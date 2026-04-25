@@ -3,9 +3,10 @@ import { api } from '../api';
 import { useRazorpay } from '../hooks/useRazorpay';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import LoginRequiredModal from '../components/LoginRequiredModal';
 
 export default function DoctorsPage() {
-  const { user } = useAuth();
+  const { user, isLoggedIn } = useAuth();
   const userId = user?.id || user?.userId || 'u1';
   const { pay } = useRazorpay();
   const toast = useToast();
@@ -17,6 +18,7 @@ export default function DoctorsPage() {
   const [saving, setSaving] = useState(false);
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   useEffect(() => {
     const fetchDoctors = async () => {
@@ -33,6 +35,11 @@ export default function DoctorsPage() {
   }, [toast]);
 
   const bookDoctor = (doctor) => {
+    if (!isLoggedIn) {
+      setShowLoginModal(true);
+      return;
+    }
+
     if (!customerName.trim() || !customerEmail.trim() || !customerPhone.trim()) {
       toast.warning('Please enter name, email, and phone number before booking.');
       return;
@@ -53,7 +60,8 @@ export default function DoctorsPage() {
             customerPhone: customerPhone.trim(),
             paymentMethod: 'razorpay',
             razorpayOrderId: paymentData.razorpay_order_id,
-            razorpayPaymentId: paymentData.razorpay_payment_id
+            razorpayPaymentId: paymentData.razorpay_payment_id,
+            razorpaySignature: paymentData.razorpay_signature
           });
 
           toast.success(`Booked successfully with ${doctor.name}. Appointment saved.`);
@@ -65,6 +73,10 @@ export default function DoctorsPage() {
         }
       },
       onDismiss: () => {
+        setSaving(false);
+      },
+      onError: (error) => {
+        toast.error(error?.message || 'Payment failed. Booking was not created.');
         setSaving(false);
       }
     });
@@ -132,6 +144,13 @@ export default function DoctorsPage() {
           </article>
         );
       })}
+
+      <LoginRequiredModal
+        open={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        title="Login required for booking"
+        message="Please sign in with Google to book a doctor appointment."
+      />
     </main>
   );
 }

@@ -16,6 +16,8 @@ export default function LoginPage() {
 
     initialized.current = true;
 
+    const buttonWidth = Math.min(320, Math.max(220, window.innerWidth - 96));
+
     window.google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
       callback: async (response) => {
@@ -31,7 +33,7 @@ export default function LoginPage() {
     window.google.accounts.id.renderButton(btnRef.current, {
       theme: 'outline',
       size: 'large',
-      width: 320,
+      width: buttonWidth,
       text: 'signin_with',
       shape: 'pill'
     });
