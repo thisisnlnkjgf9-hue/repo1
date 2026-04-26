@@ -13,6 +13,15 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
+// Lightweight probe endpoint for Render health checks / keep-warm pings.
+app.get('/health2', (_req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'nouryum-api',
+    uptimeSeconds: Math.floor(process.uptime())
+  });
+});
+
 /* Serve uploaded images */
 app.use('/uploads', express.static(path.resolve(__dirname, '../../public/uploads')));
 
