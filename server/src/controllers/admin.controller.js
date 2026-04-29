@@ -10,6 +10,8 @@ import { Therapy } from '../models/therapy.model.js';
 import { TherapyPackage } from '../models/therapyPackage.model.js';
 import { TherapyBooking } from '../models/therapyBooking.model.js';
 import { HeroSlide } from '../models/heroSlide.model.js';
+import { SitePage } from '../models/sitePage.model.js';
+import { Podcast } from '../models/podcast.model.js';
 import { ADMIN_USERNAME, ADMIN_PASSWORD, JWT_SECRET } from '../config/env.js';
 import { isMongoConnected } from '../config/db.js';
 import {
@@ -105,18 +107,33 @@ export async function adminGetProducts(_req, res) {
 }
 
 export async function adminCreateProduct(req, res) {
-  const { name, category, priceInr, stock, tags, description } = req.body;
-  const image = req.file ? (req.file.cloudUrl || `/uploads/${req.file.filename}`) : (req.body.image || '');
+  const { name, category, priceInr, stock, tags, description, originalPrice, discountPercent, packOffers } = req.body;
+  // Primary image: req.files.image[0] (from fields upload) or fallback
+  const primaryFile = req.files?.image?.[0];
+  const image2File  = req.files?.image2?.[0];
+  const image3File  = req.files?.image3?.[0];
+  const image = primaryFile ? (primaryFile.cloudUrl || `/uploads/${primaryFile.filename}`) : (req.body.image || '');
+  const images = [
+    image2File ? (image2File.cloudUrl || `/uploads/${image2File.filename}`) : '',
+    image3File ? (image3File.cloudUrl || `/uploads/${image3File.filename}`) : '',
+  ].filter(Boolean);
   if (!name || !priceInr) return res.status(400).json({ message: 'name and priceInr are required.' });
+
+  let parsedPackOffers = [];
+  if (packOffers) {
+    try { parsedPackOffers = typeof packOffers === 'string' ? JSON.parse(packOffers) : packOffers; } catch { parsedPackOffers = []; }
+  }
 
   if (isMongoConnected()) {
     const product = await Product.create({
-      name, category: category || 'general', priceInr: Number(priceInr), stock: Number(stock) || 0,
-      tags: tags ? tags.split(',').map(t => t.trim()) : [], description, image
+      name, category: category || 'general', priceInr: Number(priceInr),
+      originalPrice: Number(originalPrice) || 0, discountPercent: Number(discountPercent) || 0,
+      stock: Number(stock) || 0,
+      tags: tags ? tags.split(',').map(t => t.trim()) : [], description, image, images, packOffers: parsedPackOffers
     });
     return res.status(201).json({ product });
   }
-  const product = { id: `prod_${Date.now()}`, name, category: category || 'general', priceInr: Number(priceInr), stock: Number(stock) || 0, tags: tags ? tags.split(',').map(t => t.trim()) : [], description, image };
+  const product = { id: `prod_${Date.now()}`, name, category: category || 'general', priceInr: Number(priceInr), originalPrice: Number(originalPrice) || 0, discountPercent: Number(discountPercent) || 0, stock: Number(stock) || 0, tags: tags ? tags.split(',').map(t => t.trim()) : [], description, image, images, packOffers: parsedPackOffers };
   memProducts.push(product);
   return res.status(201).json({ product });
 }
@@ -124,10 +141,25 @@ export async function adminCreateProduct(req, res) {
 export async function adminUpdateProduct(req, res) {
   const { id } = req.params;
   const updates = { ...req.body };
-  if (req.file) updates.image = req.file.cloudUrl || `/uploads/${req.file.filename}`;
+  // Primary image from req.files.image[0]
+  const primaryFile = req.files?.image?.[0];
+  const image2File  = req.files?.image2?.[0];
+  const image3File  = req.files?.image3?.[0];
+  if (primaryFile) updates.image = primaryFile.cloudUrl || `/uploads/${primaryFile.filename}`;
   if (updates.tags && typeof updates.tags === 'string') updates.tags = updates.tags.split(',').map(t => t.trim());
   if (updates.priceInr) updates.priceInr = Number(updates.priceInr);
   if (updates.stock) updates.stock = Number(updates.stock);
+  if (updates.originalPrice !== undefined) updates.originalPrice = Number(updates.originalPrice) || 0;
+  if (updates.discountPercent !== undefined) updates.discountPercent = Number(updates.discountPercent) || 0;
+  if (updates.packOffers && typeof updates.packOffers === 'string') {
+    try { updates.packOffers = JSON.parse(updates.packOffers); } catch { delete updates.packOffers; }
+  }
+  // Build images array: prefer uploaded files, fall back to existing URL text fields
+  const img2 = image2File ? (image2File.cloudUrl || `/uploads/${image2File.filename}`) : (updates.image2 || null);
+  const img3 = image3File ? (image3File.cloudUrl || `/uploads/${image3File.filename}`) : (updates.image3 || null);
+  const extraImages = [img2, img3].filter(Boolean);
+  if (image2File || image3File) updates.images = extraImages;
+  delete updates.image2; delete updates.image3;
 
   if (isMongoConnected()) {
     const product = await Product.findByIdAndUpdate(id, updates, { new: true });
@@ -259,18 +291,40 @@ export async function adminGetFeedbacks(_req, res) {
 /* ═══════════════════════════════════════════════
    HERO SLIDES CRUD
    ═══════════════════════════════════════════════ */
+const SUPABASE_PRODUCTS = 'https://zhbnmlroytjmdykkvwhn.storage.supabase.co/storage/v1/object/public/nouryum/site/products';
+const FALLBACK_PRODUCT_SLIDES = [
+  { label: 'Herbal Hair Care',  image: `${SUPABASE_PRODUCTS}/product1.jpeg`, order: 1 },
+  { label: 'Ayurvedic Shampoo', image: `${SUPABASE_PRODUCTS}/product2.jpeg`, order: 2 },
+  { label: 'Natural Oils',      image: `${SUPABASE_PRODUCTS}/product3.jpeg`, order: 3 },
+  { label: 'Root Strengthener', image: `${SUPABASE_PRODUCTS}/product4.jpeg`, order: 4 },
+  { label: 'Scalp Therapy',     image: `${SUPABASE_PRODUCTS}/product5.jpeg`, order: 5 },
+  { label: 'Herbal Blend',      image: `${SUPABASE_PRODUCTS}/product6.jpeg`, order: 6 },
+  { label: 'Pure Botanicals',   image: `${SUPABASE_PRODUCTS}/product7.jpeg`, order: 7 },
+];
+
 export async function adminGetHeroSlides(_req, res) {
   if (isMongoConnected()) {
+    // Auto-seed product slides on first visit if none exist yet
+    const productCount = await HeroSlide.countDocuments({ type: 'product' });
+    if (productCount === 0) {
+      await HeroSlide.insertMany(
+        FALLBACK_PRODUCT_SLIDES.map(s => ({ ...s, type: 'product', isActive: true, title: '', subtitle: '' }))
+      );
+    }
     const heroSlides = await HeroSlide.find().sort({ order: 1, createdAt: -1 }).lean();
     return res.json({ heroSlides });
   }
 
-  const slides = [...memHeroSlides].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
-  return res.json({ heroSlides: slides });
+  // Fallback: merge static hero slides + product slides
+  const combined = [
+    ...memHeroSlides,
+    ...FALLBACK_PRODUCT_SLIDES.map((s, i) => ({ ...s, id: `ps${i + 1}`, type: 'product', isActive: true })),
+  ].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+  return res.json({ heroSlides: combined });
 }
 
 export async function adminCreateHeroSlide(req, res) {
-  const { title = '', subtitle = '', order = 0, isActive = 'true' } = req.body;
+  const { title = '', subtitle = '', label = '', order = 0, isActive = 'true', type = 'hero' } = req.body;
   const image = req.file ? (req.file.cloudUrl || `/uploads/${req.file.filename}`) : (req.body.image || '');
 
   if (!image) {
@@ -280,9 +334,11 @@ export async function adminCreateHeroSlide(req, res) {
   const payload = {
     title,
     subtitle,
+    label,
     image,
     order: Number(order) || 0,
-    isActive: String(isActive) !== 'false'
+    isActive: String(isActive) !== 'false',
+    type: ['hero', 'product'].includes(type) ? type : 'hero'
   };
 
   if (isMongoConnected()) {
@@ -304,6 +360,7 @@ export async function adminUpdateHeroSlide(req, res) {
   if (req.file) updates.image = req.file.cloudUrl || `/uploads/${req.file.filename}`;
   if (updates.order !== undefined) updates.order = Number(updates.order) || 0;
   if (updates.isActive !== undefined) updates.isActive = String(updates.isActive) !== 'false';
+  if (updates.type && !['hero', 'product'].includes(updates.type)) delete updates.type;
 
   if (isMongoConnected()) {
     const heroSlide = await HeroSlide.findByIdAndUpdate(id, updates, { new: true });
@@ -462,3 +519,104 @@ export async function adminUpdateTherapyBooking(req, res) {
     return res.json({ therapyBooking: booking });
   }
 }
+
+/* ═══════════════════════════════════════════════
+   SITE PAGES (about / contact / tnc)
+   ═══════════════════════════════════════════════ */
+const SITE_PAGE_DEFAULTS = {
+  about:   { title: 'About Us',      content: 'About Nouryum...' },
+  contact: { title: 'Contact Us',    content: 'Email: hello@nouryum.com\nPhone: +91-XXXXXXXXXX\nAddress: ...' },
+  tnc:     { title: 'Terms & Conditions', content: 'By using Nouryum, you agree to our Terms and Conditions...' },
+};
+
+export async function adminGetSitePages(_req, res) {
+  if (!isMongoConnected()) return res.json({ sitePages: [] });
+  const sitePages = await SitePage.find().lean();
+  // Ensure all three slugs exist
+  const slugs = sitePages.map(p => p.slug);
+  for (const [slug, def] of Object.entries(SITE_PAGE_DEFAULTS)) {
+    if (!slugs.includes(slug)) {
+      const p = await SitePage.create({ slug, ...def });
+      sitePages.push(p);
+    }
+  }
+  return res.json({ sitePages });
+}
+
+export async function adminGetSitePage(req, res) {
+  const { slug } = req.params;
+  if (!isMongoConnected()) {
+    return res.json({ sitePage: { slug, ...SITE_PAGE_DEFAULTS[slug] } });
+  }
+  let page = await SitePage.findOne({ slug }).lean();
+  if (!page) {
+    page = await SitePage.create({ slug, ...SITE_PAGE_DEFAULTS[slug] });
+  }
+  return res.json({ sitePage: page });
+}
+
+export async function adminUpdateSitePage(req, res) {
+  const { slug } = req.params;
+  const { title, content } = req.body;
+  if (!isMongoConnected()) return res.status(503).json({ message: 'MongoDB not connected.' });
+  const page = await SitePage.findOneAndUpdate(
+    { slug }, { title, content }, { new: true, upsert: true }
+  );
+  return res.json({ sitePage: page });
+}
+
+/* ═══════════════════════════════════════════════
+   PODCASTS CRUD
+   ═══════════════════════════════════════════════ */
+
+/** Convert any YouTube watch/short/embed URL → embed URL */
+function toYouTubeEmbedUrl(raw) {
+  if (!raw) return '';
+  if (raw.includes('youtube.com/embed/')) return raw.trim();
+  const shortMatch = raw.match(/youtu\.be\/([\w-]+)/);
+  if (shortMatch) return `https://www.youtube.com/embed/${shortMatch[1]}`;
+  const watchMatch = raw.match(/[?&]v=([\w-]+)/);
+  if (watchMatch) return `https://www.youtube.com/embed/${watchMatch[1]}`;
+  const shortsMatch = raw.match(/youtube\.com\/shorts\/([\w-]+)/);
+  if (shortsMatch) return `https://www.youtube.com/embed/${shortsMatch[1]}`;
+  return raw.trim();
+}
+
+export async function adminGetPodcasts(_req, res) {
+  if (!isMongoConnected()) return res.status(503).json({ message: 'MongoDB not connected.' });
+  const podcasts = await Podcast.find().sort({ order: 1, createdAt: -1 }).lean();
+  return res.json({ podcasts });
+}
+
+export async function adminCreatePodcast(req, res) {
+  const { title, description, youtubeUrl, isActive, order } = req.body;
+  if (!title || !youtubeUrl) return res.status(400).json({ message: 'title and youtubeUrl are required.' });
+  if (!isMongoConnected()) return res.status(503).json({ message: 'MongoDB not connected.' });
+  const podcast = await Podcast.create({
+    title,
+    description: description || '',
+    youtubeUrl: toYouTubeEmbedUrl(youtubeUrl),
+    isActive: String(isActive) !== 'false',
+    order: Number(order) || 0,
+  });
+  return res.status(201).json({ podcast });
+}
+
+export async function adminUpdatePodcast(req, res) {
+  const { id } = req.params;
+  const updates = { ...req.body };
+  if (updates.youtubeUrl) updates.youtubeUrl = toYouTubeEmbedUrl(updates.youtubeUrl);
+  if (updates.isActive !== undefined) updates.isActive = String(updates.isActive) !== 'false';
+  if (updates.order !== undefined) updates.order = Number(updates.order) || 0;
+  if (!isMongoConnected()) return res.status(503).json({ message: 'MongoDB not connected.' });
+  const podcast = await Podcast.findByIdAndUpdate(id, updates, { new: true });
+  if (!podcast) return res.status(404).json({ message: 'Podcast not found.' });
+  return res.json({ podcast });
+}
+
+export async function adminDeletePodcast(req, res) {
+  if (!isMongoConnected()) return res.status(503).json({ message: 'MongoDB not connected.' });
+  await Podcast.findByIdAndDelete(req.params.id);
+  return res.json({ message: 'Podcast deleted.' });
+}
+

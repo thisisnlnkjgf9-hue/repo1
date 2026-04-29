@@ -7,7 +7,7 @@ import LoginRequiredModal from '../components/LoginRequiredModal';
 
 const SUPABASE_PRODUCTS = 'https://zhbnmlroytjmdykkvwhn.storage.supabase.co/storage/v1/object/public/nouryum/site/products';
 
-const PRODUCT_IMAGES = [
+const FALLBACK_PRODUCT_IMAGES = [
   { src: `${SUPABASE_PRODUCTS}/product1.jpeg`, label: 'Herbal Hair Care' },
   { src: `${SUPABASE_PRODUCTS}/product2.jpeg`, label: 'Ayurvedic Shampoo' },
   { src: `${SUPABASE_PRODUCTS}/product3.jpeg`, label: 'Natural Oils' },
@@ -17,7 +17,8 @@ const PRODUCT_IMAGES = [
   { src: `${SUPABASE_PRODUCTS}/product7.jpeg`, label: 'Pure Botanicals' },
 ];
 
-function ProductShowcase() {
+function ProductShowcase({ slides }) {
+  const PRODUCT_IMAGES = slides && slides.length ? slides : FALLBACK_PRODUCT_IMAGES;
   const [active, setActive] = useState(0);
   const [prev, setPrev]     = useState(null);
   const [fading, setFading] = useState(false);
@@ -117,7 +118,8 @@ function ProductShowcase() {
   );
 }
 
-function MobileProductSlider() {
+function MobileProductSlider({ slides }) {
+  const PRODUCT_IMAGES = slides && slides.length ? slides : FALLBACK_PRODUCT_IMAGES;
   const [active, setActive] = useState(0);
   const navigate = useNavigate();
 
@@ -183,34 +185,13 @@ const quickLinks = [
   { label: 'Weight Management',      to: '/weight',   icon: '⚖' },
 ];
 
-const featuredBlog = {
-  id: 'b1',
-  date: 'June 3, 2023',
-  title: "How to Get Rid of Acne: 21 Effective Methods",
-  text: "Acne is a common skin condition that affects nearly everyone at some point. Here are 21 effective methods to help you get rid of acne.",
-  mediaClass: 'blog-main',
-};
-
-const podcasts = [
-  {
-    id: 'p1',
-    title: 'The Path to Wellness',
-    text: 'Listen to our wellness experts discuss the latest health trends and research.',
-    mediaClass: 'podcast-1',
-  },
-  {
-    id: 'p2',
-    title: 'Healthy Living with Pathya',
-    text: 'Learn how to make healthier choices with our weekly nutrition tips and meal plans.',
-    mediaClass: 'podcast-2',
-  },
-];
-
 export default function HomePage() {
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [heroSlides, setHeroSlides] = useState([]);
+  const [productSlides, setProductSlides] = useState([]);
+  const [latestBlogs, setLatestBlogs] = useState([]);
   const [activeSlide, setActiveSlide] = useState(0);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
@@ -249,12 +230,23 @@ export default function HomePage() {
       .getHeroSlides()
       .then((res) => {
         if (!mounted) return;
-        setHeroSlides(Array.isArray(res.heroSlides) ? res.heroSlides : []);
+        const all = Array.isArray(res.heroSlides) ? res.heroSlides : [];
+        setHeroSlides(all.filter(s => s.type !== 'product'));
+        const prodSlides = all.filter(s => s.type === 'product' && s.isActive !== false);
+        setProductSlides(prodSlides.map(s => ({ src: s.image, label: s.label || s.title || '' })));
       })
       .catch(() => {
         if (!mounted) return;
         setHeroSlides([]);
       });
+
+    api
+      .getBlogs()
+      .then((res) => {
+        if (!mounted) return;
+        setLatestBlogs((res.blogs || []).slice(0, 3));
+      })
+      .catch(console.error);
 
     return () => {
       mounted = false;
@@ -346,7 +338,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <MobileProductSlider />
+          <MobileProductSlider slides={productSlides} />
 
           <div className="mobile-only mobile-home-highlights">
             <div className="mobile-highlight-chip">Personalized Wellness Plans</div>
@@ -362,9 +354,8 @@ export default function HomePage() {
         </section>
       </main>
 
-      {/* ── Product Showcase — desktop only (mobile uses MobileProductSlider above) ── */}
       <div className="desktop-only-block">
-        <ProductShowcase />
+        <ProductShowcase slides={productSlides} />
       </div>
 
       {/* ── Blog & Podcast strip (hidden on mobile) ── */}
@@ -382,40 +373,28 @@ export default function HomePage() {
         </div>
 
         <div className="card-row">
-          <article className="mini-card" id={`blog-card-${featuredBlog.id}`}>
-            <div className={`mini-media ${featuredBlog.mediaClass}`} role="img" aria-label="Blog image" />
-            <div className="mini-card-body">
-              <span className="mini-date">{featuredBlog.date}</span>
-              <h3>{featuredBlog.title}</h3>
-              <p>{featuredBlog.text}</p>
-            </div>
-            <div className="mini-card-footer">
-              <Link to={`/blogs/${featuredBlog.id}`} className="read-more-btn">Read More</Link>
-            </div>
-          </article>
-
-          <div className="podcast-col">
-            {podcasts.map((pod) => (
-              <article className="podcast-card" key={pod.id} id={`podcast-card-${pod.id}`}>
-                <div className={`podcast-media ${pod.mediaClass}`} role="img" aria-label="Podcast image" />
-                <div className="podcast-body">
-                  <h3>{pod.title}</h3>
-                  <p>{pod.text}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-
-          <article className="mini-card" id="blog-card-b3">
-            <div className="mini-media podcast-3" role="img" aria-label="Blog image" />
-            <div className="mini-card-body">
-              <h3>Mindful Movement</h3>
-              <p>Find your zen with guided meditations, yoga classes, and other relaxation techniques.</p>
-            </div>
-            <div className="mini-card-footer">
-              <Link to="/blogs/b3" className="read-more-btn">Read More</Link>
-            </div>
-          </article>
+          {latestBlogs.map((blog) => (
+            <article className="mini-card" key={blog._id || blog.id} id={`blog-card-${blog._id || blog.id}`}>
+              <div
+                className="mini-media"
+                style={{
+                  backgroundImage: `url('${blog.image || 'https://zhbnmlroytjmdykkvwhn.storage.supabase.co/storage/v1/object/public/nouryum/site/blog_acne.png'}')`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
+                role="img"
+                aria-label={blog.title}
+              />
+              <div className="mini-card-body">
+                <span className="mini-date">{blog.date}</span>
+                <h3>{blog.title}</h3>
+                <p>{blog.excerpt || blog.text}</p>
+              </div>
+              <div className="mini-card-footer">
+                <Link to={`/blogs/${blog._id || blog.id}`} className="read-more-btn">Read More</Link>
+              </div>
+            </article>
+          ))}
         </div>
       </section>
 

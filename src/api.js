@@ -113,5 +113,12 @@ export const api = {
   getWeightRecommendations: () => request('/weight/recommendations'),
 
   /* ── Profile reports ── */
-  getUserReports: (userId) => request(`/user/reports/${userId}`)
+  getUserReports: (userId) => request(`/user/reports/${userId}`),
+
+  /* ── Product detail ── */
+  getProductById: (id) => request(`/products/${id}`),
+
+  /* ── Site pages (about / contact / tnc) ── */
+  getSitePage: (slug) => request(`/site-page/${slug}`),
 };
+

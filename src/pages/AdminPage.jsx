@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useToast } from '../context/ToastContext';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
@@ -46,13 +46,18 @@ function DataTable({ columns, rows, onEdit, onDelete, idKey = '_id' }) {
 /* ────── Form Modal ────── */
 function FormModal({ title, fields, initial, onSubmit, onClose }) {
   const [values, setValues] = useState(initial || {});
-  const [file, setFile] = useState(null);
+  // Track one File object per file-type field, keyed by field name
+  const [files, setFiles] = useState({});
 
   const handleSubmit = (e) => {
     e.preventDefault();
     const fd = new FormData();
-    Object.entries(values).forEach(([k, v]) => { if (k !== 'image' && k !== '_id' && k !== '__v' && k !== 'createdAt' && k !== 'updatedAt') fd.append(k, v); });
-    if (file) fd.append('image', file);
+    Object.entries(values).forEach(([k, v]) => {
+      if (k !== 'image' && k !== 'image2' && k !== 'image3' && k !== '_id' && k !== '__v' && k !== 'createdAt' && k !== 'updatedAt')
+        fd.append(k, v);
+    });
+    // Append each uploaded file under its own field name
+    Object.entries(files).forEach(([fieldName, file]) => { if (file) fd.append(fieldName, file); });
     onSubmit(fd);
   };
 
@@ -66,7 +71,7 @@ function FormModal({ title, fields, initial, onSubmit, onClose }) {
             {f.type === 'textarea' ? (
               <textarea value={values[f.key] || ''} onChange={e => setValues(p => ({ ...p, [f.key]: e.target.value }))} rows={3} />
             ) : f.type === 'file' ? (
-              <input type="file" accept="image/*" onChange={e => setFile(e.target.files[0])} />
+              <input type="file" accept="image/*" onChange={e => setFiles(p => ({ ...p, [f.key]: e.target.files[0] }))} />
             ) : f.type === 'select' ? (
               <select value={values[f.key] || ''} onChange={e => setValues(p => ({ ...p, [f.key]: e.target.value }))} required={f.required}>
                 <option value="">Select...</option>
@@ -86,7 +91,133 @@ function FormModal({ title, fields, initial, onSubmit, onClose }) {
   );
 }
 
-const TABS = ['dashboard', 'blogs', 'products', 'doctors', 'heroSlides', 'therapies', 'therapyPackages', 'orders', 'bookings', 'therapyBookings', 'users', 'feedbacks'];
+/* ────── Bookings with Doctor Filter ────── */
+function BookingsWithFilter({ rows, columns, onEdit, token }) {
+  const [filter, setFilter] = React.useState('');
+  const [allDoctors, setAllDoctors] = React.useState([]);
+
+  // Fetch all doctors so the filter shows every doctor even with no bookings
+  React.useEffect(() => {
+    if (!token) return;
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000/api'}/admin/doctors`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(res => {
+        const names = (res.doctors || []).map(d => d.name).filter(Boolean);
+        // Also include any doctor names found in bookings that may no longer be in the list
+        const fromBookings = rows.map(r => r.doctorName).filter(Boolean);
+        const merged = [...new Set([...names, ...fromBookings])].sort();
+        setAllDoctors(merged);
+      })
+      .catch(() => {
+        // Fallback: derive from bookings only
+        setAllDoctors([...new Set(rows.map(r => r.doctorName).filter(Boolean))].sort());
+      });
+  }, [token, rows]);
+
+  const filtered = filter ? rows.filter(r => r.doctorName === filter) : rows;
+
+  return (
+    <div>
+      <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <label style={{ fontWeight: 600, fontSize: 14 }}>Filter by Doctor:</label>
+        <select
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--line)', fontSize: 14, minWidth: 200 }}
+        >
+          <option value="">All Doctors ({rows.length} bookings)</option>
+          {allDoctors.map(d => {
+            const count = rows.filter(r => r.doctorName === d).length;
+            return <option key={d} value={d}>{d} ({count})</option>;
+          })}
+        </select>
+        {filter && <button className="admin-btn" onClick={() => setFilter('')} style={{ fontSize: 12 }}>✕ Clear</button>}
+        <span style={{ fontSize: 13, color: 'var(--muted)' }}>{filtered.length} booking(s) shown</span>
+      </div>
+      <DataTable columns={columns} rows={filtered} onEdit={onEdit} />
+    </div>
+  );
+}
+
+
+/* ────── Site Pages Editor ────── */
+function SitePagesEditor({ token, onError }) {
+  const SLUGS = [
+    { slug: 'about', label: '🌿 About Us' },
+    { slug: 'contact', label: '📞 Contact Us' },
+    { slug: 'tnc', label: '📋 Terms & Conditions' },
+  ];
+  const [pages, setPages] = React.useState({});
+  const [saving, setSaving] = React.useState('');
+
+  React.useEffect(() => {
+    SLUGS.forEach(({ slug }) => {
+      api(`/sitePages/${slug}`, {}, token)
+        .then(res => setPages(p => ({ ...p, [slug]: res.sitePage })))
+        .catch(onError);
+    });
+  }, [token]);
+
+  const save = async (slug) => {
+    setSaving(slug);
+    try {
+      await api(
+        `/sitePages/${slug}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            title: pages[slug]?.title || '',
+            content: pages[slug]?.content || '',
+          }),
+        },
+        token
+      );
+      alert(`"${pages[slug]?.title || slug}" page saved successfully!`);
+    } catch (err) { onError(err); }
+    finally { setSaving(''); }
+  };
+
+
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+      {SLUGS.map(({ slug, label }) => (
+        <div key={slug} style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 24, background: '#fff' }}>
+          <h3 style={{ marginBottom: 16, fontSize: 18 }}>{label}</h3>
+          <div className="admin-field">
+            <label>Page Title</label>
+            <input
+              value={pages[slug]?.title || ''}
+              onChange={e => setPages(p => ({ ...p, [slug]: { ...p[slug], title: e.target.value } }))}
+            />
+          </div>
+          <div className="admin-field">
+            <label>Content (plain text / line breaks supported)</label>
+            <textarea
+              rows={10}
+              value={pages[slug]?.content || ''}
+              onChange={e => setPages(p => ({ ...p, [slug]: { ...p[slug], content: e.target.value } }))}
+              style={{ fontFamily: 'monospace', fontSize: 13 }}
+            />
+          </div>
+          <button
+            className="admin-btn primary"
+            onClick={() => save(slug)}
+            disabled={saving === slug}
+            style={{ marginTop: 8 }}
+          >
+            {saving === slug ? 'Saving…' : 'Save Page'}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const TABS = ['dashboard', 'blogs', 'products', 'podcasts', 'doctors', 'productSlides', 'therapies', 'therapyPackages', 'orders', 'bookings', 'therapyBookings', 'users', 'feedbacks', 'sitePages'];
+
 
 export default function AdminPage() {
   const toast = useToast();
@@ -125,11 +256,15 @@ export default function AdminPage() {
     }
   }, [logout, toast]);
 
+  /* Map frontend entity name → API path (productSlides is a view of heroSlides) */
+  const entityToApi = (entity) => entity === 'productSlides' ? 'heroSlides' : entity;
+
   const load = useCallback(async (entity) => {
+    const apiEntity = entityToApi(entity);
     setLoading(true);
     try {
-      const res = await api(`/${entity}`, {}, token);
-      setData(p => ({ ...p, [entity]: res[entity] || [] }));
+      const res = await api(`/${apiEntity}`, {}, token);
+      setData(p => ({ ...p, [apiEntity]: res[apiEntity] || [], [entity]: res[apiEntity] || [] }));
     } catch (err) {
       handleError(err);
     } finally {
@@ -151,29 +286,32 @@ export default function AdminPage() {
   }, [tab, token, load, loadStats]);
 
   const handleCreate = async (entity, formData) => {
+    const apiEntity = entityToApi(entity);
     try {
-      await api(`/${entity}`, { method: 'POST', body: formData }, token);
+      await api(`/${apiEntity}`, { method: 'POST', body: formData }, token);
       toast.success(`${entity.replace(/([A-Z])/g, ' $1').toLowerCase()} created`);
       setModal(null);
-      load(entity);
+      load(apiEntity);
     } catch (err) { handleError(err); }
   };
 
   const handleUpdate = async (entity, id, formData) => {
+    const apiEntity = entityToApi(entity);
     try {
-      await api(`/${entity}/${id}`, { method: 'PUT', body: formData }, token);
+      await api(`/${apiEntity}/${id}`, { method: 'PUT', body: formData }, token);
       toast.success(`${entity.replace(/([A-Z])/g, ' $1').toLowerCase()} updated`);
       setModal(null);
-      load(entity);
+      load(apiEntity);
     } catch (err) { handleError(err); }
   };
 
   const handleDelete = async (entity, id) => {
+    const apiEntity = entityToApi(entity);
     if (!confirm('Delete this item?')) return;
     try {
-      await api(`/${entity}/${id}`, { method: 'DELETE' }, token);
+      await api(`/${apiEntity}/${id}`, { method: 'DELETE' }, token);
       toast.success(`Deleted`);
-      load(entity);
+      load(apiEntity);
     } catch (err) { handleError(err); }
   };
 
@@ -205,11 +343,16 @@ export default function AdminPage() {
   const productFields = [
     { key: 'name', label: 'Name', required: true },
     { key: 'category', label: 'Category' },
-    { key: 'priceInr', label: 'Price (₹)', type: 'number', required: true },
+    { key: 'priceInr', label: 'Selling Price (₹)', type: 'number', required: true },
+    { key: 'originalPrice', label: 'MRP / Original Price (₹)', type: 'number' },
+    { key: 'discountPercent', label: 'Discount %', type: 'number' },
     { key: 'stock', label: 'Stock', type: 'number' },
     { key: 'description', label: 'Description', type: 'textarea' },
     { key: 'tags', label: 'Tags (comma-separated)' },
-    { key: 'image', label: 'Product Image', type: 'file' },
+    { key: 'packOffers', label: 'Pack Offers (JSON: [{quantity,price,label}])', type: 'textarea' },
+    { key: 'image', label: 'Primary Image', type: 'file' },
+    { key: 'image2', label: 'Image 2', type: 'file' },
+    { key: 'image3', label: 'Image 3', type: 'file' },
   ];
   const doctorFields = [
     { key: 'name', label: 'Name', required: true },
@@ -237,8 +380,10 @@ export default function AdminPage() {
     { key: 'extras', label: 'Extras (comma-separated)', type: 'textarea' },
   ];
   const heroSlideFields = [
+    { key: 'type', label: 'Type', type: 'select', options: ['hero', 'product'] },
     { key: 'title', label: 'Title' },
     { key: 'subtitle', label: 'Subtitle' },
+    { key: 'label', label: 'Product Label (shown on slide)' },
     { key: 'order', label: 'Display Order', type: 'number' },
     { key: 'isActive', label: 'Active', type: 'select', options: ['true', 'false'] },
     { key: 'image', label: 'Slide Image', type: 'file', required: true },
@@ -266,8 +411,9 @@ export default function AdminPage() {
     { key: 'consultationFee', label: 'Fee' }, { key: 'image', label: 'Photo' }
   ];
   const heroSlideCols = [
+    { key: 'type', label: 'Type' },
     { key: 'title', label: 'Title' },
-    { key: 'subtitle', label: 'Subtitle' },
+    { key: 'label', label: 'Label' },
     { key: 'order', label: 'Order' },
     { key: 'isActive', label: 'Active' },
     { key: 'image', label: 'Image' }
@@ -301,6 +447,20 @@ export default function AdminPage() {
     { key: 'therapyName', label: 'Therapy' }, { key: 'preferredDate', label: 'Date' },
     { key: 'status', label: 'Status' }
   ];
+  const podcastFields = [
+    { key: 'title', label: 'Title', required: true },
+    { key: 'description', label: 'Description', type: 'textarea' },
+    { key: 'youtubeUrl', label: 'YouTube URL (watch, short, or embed)', required: true },
+    { key: 'order', label: 'Display Order', type: 'number' },
+    { key: 'isActive', label: 'Active', type: 'select', options: ['true', 'false'] },
+  ];
+  const podcastCols = [
+    { key: 'title', label: 'Title' },
+    { key: 'description', label: 'Description' },
+    { key: 'youtubeUrl', label: 'YouTube Embed URL' },
+    { key: 'order', label: 'Order' },
+    { key: 'isActive', label: 'Active' },
+  ];
   const feedbackCols = [
     { key: 'name', label: 'Name' }, { key: 'rating', label: 'Rating' }, { key: 'comment', label: 'Comment' }
   ];
@@ -321,7 +481,9 @@ export default function AdminPage() {
               {t === 'doctors' && '👨‍⚕️'} {t === 'therapies' && '🧘'} {t === 'therapyPackages' && '🏷️'}
               {t === 'orders' && '📦'} {t === 'users' && '👥'}
               {t === 'bookings' && '📅'} {t === 'therapyBookings' && '📆'} {t === 'feedbacks' && '💬'}
-              <span>{t.charAt(0).toUpperCase() + t.slice(1).replace(/([A-Z])/g, ' $1')}</span>
+              {t === 'podcasts' && '🎙️'}
+              {t === 'productSlides' && '🖼️'}
+              <span>{t === 'productSlides' ? 'Product Slides' : t.charAt(0).toUpperCase() + t.slice(1).replace(/([A-Z])/g, ' $1')}</span>
             </button>
           ))}
         </nav>
@@ -332,7 +494,7 @@ export default function AdminPage() {
       <section className="admin-content">
         <header className="admin-header">
           <h1>{tab.charAt(0).toUpperCase() + tab.slice(1).replace(/([A-Z])/g, ' $1')}</h1>
-          {['blogs', 'products', 'doctors', 'heroSlides', 'therapies', 'therapyPackages'].includes(tab) && (
+          {['blogs', 'products', 'podcasts', 'doctors', 'heroSlides', 'productSlides', 'therapies', 'therapyPackages'].includes(tab) && (
             <button className="admin-btn primary" onClick={() => setModal({ type: 'create', entity: tab })}>
               + Add {tab}
             </button>
@@ -379,6 +541,10 @@ export default function AdminPage() {
         {tab === 'heroSlides' && <DataTable columns={heroSlideCols} rows={data.heroSlides || []}
           onEdit={r => setModal({ type: 'edit', entity: 'heroSlides', initial: { ...r, isActive: String(r.isActive ?? true) } })}
           onDelete={id => handleDelete('heroSlides', id)} />}
+
+        {tab === 'productSlides' && <DataTable columns={heroSlideCols} rows={(data.heroSlides || []).filter(s => s.type === 'product')}
+          onEdit={r => setModal({ type: 'edit', entity: 'productSlides', initial: { ...r, isActive: String(r.isActive ?? true) } })}
+          onDelete={id => handleDelete('heroSlides', id)} />}
           
         {tab === 'therapies' && <DataTable columns={therapyCols} rows={data.therapies || []}
           onEdit={r => setModal({ type: 'edit', entity: 'therapies', initial: r })}
@@ -391,17 +557,45 @@ export default function AdminPage() {
         {tab === 'orders' && <DataTable columns={orderCols} rows={data.orders || []}
           onEdit={r => setModal({ type: 'edit', entity: 'orders', initial: r })} />}
           
-        {tab === 'bookings' && <DataTable columns={bookingCols} rows={data.bookings || []}
-          onEdit={r => setModal({ type: 'edit', entity: 'bookings', initial: r })} />}
+        {tab === 'bookings' && (
+          <BookingsWithFilter
+            rows={data.bookings || []}
+            columns={bookingCols}
+            token={token}
+            onEdit={r => setModal({ type: 'edit', entity: 'bookings', initial: r })}
+          />
+        )}
           
         {tab === 'therapyBookings' && <DataTable columns={therapyBookingCols} rows={data.therapyBookings || []}
           onEdit={r => setModal({ type: 'edit', entity: 'therapyBookings', initial: r })} />}
 
         {tab === 'users' && <DataTable columns={userCols} rows={data.users || []} />}
         {tab === 'feedbacks' && <DataTable columns={feedbackCols} rows={data.feedbacks || []} />}
+        {tab === 'sitePages' && <SitePagesEditor token={token} onError={handleError} />}
+        {tab === 'podcasts' && <DataTable columns={podcastCols} rows={data.podcasts || []}
+          onEdit={r => setModal({ type: 'edit', entity: 'podcasts', initial: { ...r, isActive: String(r.isActive ?? true) } })}
+          onDelete={id => handleDelete('podcasts', id)} />}
       </section>
 
       {/* MODAL */}
+      {modal && modal.type === 'create' && modal.entity === 'podcasts' && (
+        <FormModal title="New Podcast" fields={podcastFields} initial={{ isActive: 'true', order: 0 }} onClose={() => setModal(null)}
+          onSubmit={fd => {
+            const body = Object.fromEntries(fd.entries());
+            api('/podcasts', { method: 'POST', body: JSON.stringify(body) }, token)
+              .then(() => { toast.success('podcast created'); setModal(null); load('podcasts'); })
+              .catch(handleError);
+          }} />
+      )}
+      {modal && modal.type === 'edit' && modal.entity === 'podcasts' && (
+        <FormModal title="Edit Podcast" fields={podcastFields} initial={modal.initial} onClose={() => setModal(null)}
+          onSubmit={fd => {
+            const body = Object.fromEntries(fd.entries());
+            api(`/podcasts/${modal.initial._id || modal.initial.id}`, { method: 'PUT', body: JSON.stringify(body) }, token)
+              .then(() => { toast.success('podcast updated'); setModal(null); load('podcasts'); })
+              .catch(handleError);
+          }} />
+      )}
       {modal && modal.type === 'create' && modal.entity === 'blogs' && (
         <FormModal title="New Blog" fields={blogFields} onClose={() => setModal(null)}
           onSubmit={fd => handleCreate('blogs', fd)} />
@@ -433,6 +627,35 @@ export default function AdminPage() {
       {modal && modal.type === 'edit' && modal.entity === 'heroSlides' && (
         <FormModal title="Edit Hero Slide" fields={heroSlideFields} initial={modal.initial} onClose={() => setModal(null)}
           onSubmit={fd => handleUpdate('heroSlides', modal.initial._id || modal.initial.id, fd)} />
+      )}
+      {/* Product Slides (type=product) — uses heroSlides API but always sets type=product */}
+      {modal && modal.type === 'create' && modal.entity === 'productSlides' && (
+        <FormModal
+          title="🖼️ New Product Slide"
+          fields={[
+            { key: 'label', label: 'Product Label (shown on slide, e.g. "Natural Oils")', required: true },
+            { key: 'order', label: 'Display Order', type: 'number' },
+            { key: 'isActive', label: 'Active', type: 'select', options: ['true', 'false'] },
+            { key: 'image', label: 'Slide Image', type: 'file', required: true },
+          ]}
+          initial={{ isActive: 'true', order: 0 }}
+          onClose={() => setModal(null)}
+          onSubmit={fd => { fd.append('type', 'product'); handleCreate('heroSlides', fd); }}
+        />
+      )}
+      {modal && modal.type === 'edit' && modal.entity === 'productSlides' && (
+        <FormModal
+          title="🖼️ Edit Product Slide"
+          fields={[
+            { key: 'label', label: 'Product Label (shown on slide)', required: true },
+            { key: 'order', label: 'Display Order', type: 'number' },
+            { key: 'isActive', label: 'Active', type: 'select', options: ['true', 'false'] },
+            { key: 'image', label: 'Slide Image (leave blank to keep existing)', type: 'file' },
+          ]}
+          initial={modal.initial}
+          onClose={() => setModal(null)}
+          onSubmit={fd => { fd.append('type', 'product'); handleUpdate('heroSlides', modal.initial._id || modal.initial.id, fd); }}
+        />
       )}
       {modal && modal.type === 'create' && modal.entity === 'therapies' && (
         <FormModal title="New Therapy" fields={therapyFields} onClose={() => setModal(null)}

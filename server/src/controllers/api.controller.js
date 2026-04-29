@@ -18,6 +18,7 @@ import {
   users
 } from '../data/store.js';
 import { ChatMessage } from '../models/chatMessage.model.js';
+import { Podcast } from '../models/podcast.model.js';
 import { Feedback } from '../models/feedback.model.js';
 import { Booking } from '../models/booking.model.js';
 import { Order } from '../models/order.model.js';
@@ -976,7 +977,11 @@ export async function getBlogById(req, res) {
 }
 
 /* ───── podcasts ───── */
-export function getPodcasts(_req, res) {
+export async function getPodcasts(_req, res) {
+  if (isMongoConnected()) {
+    const mongoPodcasts = await Podcast.find({ isActive: true }).sort({ order: 1, createdAt: -1 }).lean();
+    return res.json({ podcasts: mongoPodcasts.map(p => ({ ...p, id: p._id.toString() })) });
+  }
   res.json({ podcasts });
 }
 
@@ -987,8 +992,10 @@ export async function getHeroSlides(_req, res) {
     return res.json({
       heroSlides: slides.map((slide) => ({
         id: slide._id.toString(),
+        type: slide.type || 'hero',
         title: slide.title || '',
         subtitle: slide.subtitle || '',
+        label: slide.label || '',
         image: slide.image || '',
         order: Number(slide.order) || 0,
         isActive: Boolean(slide.isActive)
@@ -1099,3 +1106,37 @@ export async function submitFeedback(req, res) {
   return res.status(201).json({ feedback });
 }
 
+/* ───── product detail ───── */
+export async function getProductById(req, res) {
+  const { id } = req.params;
+  if (isMongoConnected()) {
+    try {
+      const product = await Product.findById(id).lean();
+      if (!product) return res.status(404).json({ message: 'Product not found.' });
+      return res.json({ product: { ...product, id: product._id.toString() } });
+    } catch {
+      return res.status(404).json({ message: 'Product not found.' });
+    }
+  }
+  const product = products.find(p => p.id === id);
+  if (!product) return res.status(404).json({ message: 'Product not found.' });
+  return res.json({ product });
+}
+
+/* ───── site page (public) ───── */
+import { SitePage } from '../models/sitePage.model.js';
+const PAGE_DEFAULTS = {
+  about:   { title: 'About Us',      content: 'Nouryum is a digital Ayurvedic health platform.' },
+  contact: { title: 'Contact Us',    content: 'Email: hello@nouryum.com' },
+  tnc:     { title: 'Terms & Conditions', content: 'By using Nouryum, you agree to our terms.' },
+};
+export async function getSitePagePublic(req, res) {
+  const { slug } = req.params;
+  if (!['about','contact','tnc'].includes(slug)) return res.status(404).json({ message: 'Page not found.' });
+  if (isMongoConnected()) {
+    let page = await SitePage.findOne({ slug }).lean();
+    if (!page) page = await SitePage.create({ slug, ...PAGE_DEFAULTS[slug] });
+    return res.json({ sitePage: page });
+  }
+  return res.json({ sitePage: { slug, ...PAGE_DEFAULTS[slug] } });
+}

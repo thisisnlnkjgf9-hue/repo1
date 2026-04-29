@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api';
 import { useRazorpay } from '../hooks/useRazorpay';
 import { useToast } from '../context/ToastContext';
@@ -175,17 +175,39 @@ export default function ProductsPage() {
       />
 
       <div className="products-grid">
-        {filtered.map((product) => (
-          <article className="product-card" key={product.id} id={`product-${product.id}`}>
-            <img src={product.image} alt={product.name} loading="lazy" />
-            <h3>{product.name}</h3>
-            <p className="product-price">₹{product.priceInr}</p>
-            <div className="product-card-actions">
-              <button type="button" className="add-btn" onClick={() => add(product)}>Add to Cart</button>
-              <button type="button" className="buy-btn" onClick={() => buyNow(product)}>Buy Now</button>
-            </div>
-          </article>
-        ))}
+        {filtered.map((product) => {
+          const hasDiscount = product.originalPrice && product.originalPrice > product.priceInr;
+          const discountPct = product.discountPercent ||
+            (hasDiscount ? Math.round(((product.originalPrice - product.priceInr) / product.originalPrice) * 100) : 0);
+          return (
+            <article className="product-card" key={product.id} id={`product-${product.id}`}>
+              <Link to={`/products/${product.id || product._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                <div style={{ position: 'relative' }}>
+                  <img src={product.image} alt={product.name} loading="lazy" />
+                  {discountPct > 0 && (
+                    <span style={{
+                      position: 'absolute', top: 8, right: 8,
+                      background: 'linear-gradient(135deg,#e53e3e,#c53030)',
+                      color: '#fff', borderRadius: 20, padding: '3px 10px',
+                      fontSize: 11, fontWeight: 700, fontFamily: 'Epilogue, sans-serif'
+                    }}>{discountPct}% OFF</span>
+                  )}
+                </div>
+                <h3>{product.name}</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {hasDiscount && (
+                    <span className="product-price" style={{ textDecoration: 'line-through', opacity: 0.5, fontSize: 13 }}>₹{product.originalPrice}</span>
+                  )}
+                  <p className="product-price" style={{ margin: 0 }}>₹{product.priceInr}</p>
+                </div>
+              </Link>
+              <div className="product-card-actions">
+                <button type="button" className="add-btn" onClick={() => add(product)}>Add to Cart</button>
+                <button type="button" className="buy-btn" onClick={() => buyNow(product)}>Buy Now</button>
+              </div>
+            </article>
+          );
+        })}
       </div>
 
       {/* Cart Drawer */}

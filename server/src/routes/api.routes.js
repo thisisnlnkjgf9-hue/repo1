@@ -48,6 +48,7 @@ import {
   getWeightRecommendations,
   getUserReports
 } from '../controllers/weight.controller.js';
+import { getProductById, getSitePagePublic } from '../controllers/api.controller.js';
 
 const router = Router();
 
@@ -61,9 +62,11 @@ router.get('/podcasts', getPodcasts);
 router.get('/feedback', getFeedbacks);
 router.get('/doctors', getDoctors);
 router.get('/products', getProducts);
+router.get('/products/:id', getProductById);
 router.get('/prakriti/questions', getPrakritiQuestions);
 router.get('/therapies', getTherapies);
 router.get('/therapy-packages', getTherapyPackages);
+router.get('/site-page/:slug', getSitePagePublic);
 
 /* ── Protected routes (require login) ── */
 router.get('/auth/me', authRequired, getMe);

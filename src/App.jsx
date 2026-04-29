@@ -24,6 +24,9 @@ import WeightAssessmentPage from './pages/WeightAssessmentPage';
 import WeightPlanPage from './pages/WeightPlanPage';
 import WeightProgressPage from './pages/WeightProgressPage';
 import PanchakarmaPage from './pages/PanchakarmaPage';
+import ProductDetailPage from './pages/ProductDetailPage';
+import ContactPage from './pages/ContactPage';
+import TnCPage from './pages/TnCPage';
 
 export default function App() {
   // useAuth kept so Header can read user/logout
@@ -57,6 +60,11 @@ export default function App() {
           <Route path="/weight/progress" element={<RequireAuth><WeightProgressPage /></RequireAuth>} />
           {/* Panchakarma */}
           <Route path="/panchakarma" element={<PanchakarmaPage />} />
+          {/* Product Detail */}
+          <Route path="/products/:id" element={<ProductDetailPage />} />
+          {/* Site Pages */}
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/terms" element={<TnCPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

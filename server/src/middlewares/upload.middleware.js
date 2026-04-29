@@ -93,3 +93,44 @@ export const uploadToCloud = async (req, res, next) => {
 
   next();
 };
+
+/**
+ * Upload multiple named image fields (e.g. image, image2, image3) to Supabase.
+ * Works with multer().fields([...]) — populates req.files[fieldName][0].cloudUrl.
+ */
+export const uploadMultipleToCloud = async (req, res, next) => {
+  if (!req.files || typeof req.files !== 'object') return next();
+
+  if (!s3) {
+    const err = new Error('Supabase Storage is not configured.');
+    err.status = 503;
+    return next(err);
+  }
+
+  const publicBase = supabasePublicBaseUrl || supabaseEndpoint.replace(/\/storage\/v1\/s3\/?$/, '');
+
+  try {
+    const uploadPromises = Object.entries(req.files).map(async ([_fieldName, fileArr]) => {
+      const file = fileArr[0];
+      if (!file || !file.mimetype?.startsWith('image/')) return;
+      const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}-${file.originalname.replace(/\s+/g, '_')}`;
+      const objectPath = `${uploadFolder}/${filename}`;
+      await s3.send(new PutObjectCommand({
+        Bucket: supabaseBucket,
+        Key: objectPath,
+        Body: file.buffer,
+        ContentType: file.mimetype
+      }));
+      file.cloudUrl = `${publicBase}/storage/v1/object/public/${supabaseBucket}/${objectPath}`;
+    });
+
+    await Promise.all(uploadPromises);
+  } catch (err) {
+    console.error('Supabase multi-image upload failed:', err);
+    const uploadErr = new Error(`Cloud upload failed: ${err?.message || 'Unknown error'}`);
+    uploadErr.status = 502;
+    return next(uploadErr);
+  }
+
+  next();
+};

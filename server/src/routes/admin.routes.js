@@ -1,8 +1,4 @@
 import { Router } from 'express';
-import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
 import {
   adminLogin, adminRequired,
   adminGetBlogs, adminCreateBlog, adminUpdateBlog, adminDeleteBlog,
@@ -13,9 +9,18 @@ import {
   adminGetTherapyPackages, adminCreateTherapyPackage, adminUpdateTherapyPackage, adminDeleteTherapyPackage,
   adminGetTherapyBookings, adminUpdateTherapyBooking,
   adminGetHeroSlides, adminCreateHeroSlide, adminUpdateHeroSlide, adminDeleteHeroSlide,
+  adminGetSitePages, adminGetSitePage, adminUpdateSitePage,
+  adminGetPodcasts, adminCreatePodcast, adminUpdatePodcast, adminDeletePodcast,
   adminDashboard
 } from '../controllers/admin.controller.js';
-import { uploadImage, uploadToCloud } from '../middlewares/upload.middleware.js';
+import { uploadImage, uploadToCloud, uploadMultipleToCloud } from '../middlewares/upload.middleware.js';
+
+/* multer field config for products (primary + 2 extra images) */
+const productImageFields = uploadImage.fields([
+  { name: 'image',  maxCount: 1 },
+  { name: 'image2', maxCount: 1 },
+  { name: 'image3', maxCount: 1 },
+]);
 
 const router = Router();
 
@@ -33,8 +38,8 @@ router.delete('/blogs/:id', adminRequired, adminDeleteBlog);
 
 /* Products */
 router.get('/products', adminRequired, adminGetProducts);
-router.post('/products', adminRequired, uploadImage.single('image'), uploadToCloud, adminCreateProduct);
-router.put('/products/:id', adminRequired, uploadImage.single('image'), uploadToCloud, adminUpdateProduct);
+router.post('/products', adminRequired, productImageFields, uploadMultipleToCloud, adminCreateProduct);
+router.put('/products/:id', adminRequired, productImageFields, uploadMultipleToCloud, adminUpdateProduct);
 router.delete('/products/:id', adminRequired, adminDeleteProduct);
 
 /* Doctors */
@@ -73,10 +78,21 @@ router.put('/therapyBookings/:id', adminRequired, adminUpdateTherapyBooking);
 /* Feedbacks (read-only) */
 router.get('/feedbacks', adminRequired, adminGetFeedbacks);
 
-/* Home Hero Slides */
+/* Home Hero / Product Showcase Slides */
 router.get('/heroSlides', adminRequired, adminGetHeroSlides);
 router.post('/heroSlides', adminRequired, uploadImage.single('image'), uploadToCloud, adminCreateHeroSlide);
 router.put('/heroSlides/:id', adminRequired, uploadImage.single('image'), uploadToCloud, adminUpdateHeroSlide);
 router.delete('/heroSlides/:id', adminRequired, adminDeleteHeroSlide);
+
+/* Site Pages (about / contact / tnc) */
+router.get('/sitePages', adminRequired, adminGetSitePages);
+router.get('/sitePages/:slug', adminRequired, adminGetSitePage);
+router.put('/sitePages/:slug', adminRequired, adminUpdateSitePage);
+
+/* Podcasts */
+router.get('/podcasts', adminRequired, adminGetPodcasts);
+router.post('/podcasts', adminRequired, adminCreatePodcast);
+router.put('/podcasts/:id', adminRequired, adminUpdatePodcast);
+router.delete('/podcasts/:id', adminRequired, adminDeletePodcast);
 
 export default router;
